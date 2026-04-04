@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import '../../styles/dashboard.css';
 import { DashboardProvider } from './context/DashboardContext';
-import Sidebar from './components/Sidebar';
+import Sidebar from './components/SideBar';
 import TopBar from './components/TopBar';
 
 export const metadata: Metadata = {
