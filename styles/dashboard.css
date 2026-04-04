@@ -1,0 +1,118 @@
+/* ── Dashboard Design Tokens ──────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+  /* Backgrounds */
+  --db-bg:        #0b0d11;
+  --db-surface:   #12151c;
+  --db-surface2:  #191d27;
+  --db-surface3:  #1f2433;
+
+  /* Borders */
+  --db-border:         rgba(255, 255, 255, 0.06);
+  --db-border-accent:  rgba(255, 255, 255, 0.12);
+
+  /* Text */
+  --db-text:        #e8eaf0;
+  --db-text-muted:  #7c8096;
+  --db-text-dim:    #4a4f63;
+
+  /* Accent (lime/acid green — Amanda's signature) */
+  --db-accent:      #c8f564;
+  --db-accent-dim:  rgba(200, 245, 100, 0.12);
+  --db-accent-dim2: rgba(200, 245, 100, 0.06);
+
+  /* Semantic */
+  --db-blue:        #4da6ff;
+  --db-blue-dim:    rgba(77, 166, 255, 0.12);
+  --db-amber:       #f5a623;
+  --db-amber-dim:   rgba(245, 166, 35, 0.12);
+  --db-red:         #ff5e5e;
+  --db-red-dim:     rgba(255, 94, 94, 0.10);
+  --db-purple:      #b57bff;
+  --db-purple-dim:  rgba(181, 123, 255, 0.12);
+  --db-teal:        #34d6a8;
+  --db-teal-dim:    rgba(52, 214, 168, 0.12);
+
+  /* Layout */
+  --db-sidebar-w:         220px;
+  --db-sidebar-collapsed: 52px;
+  --db-topbar-h:          52px;
+  --db-radius:            8px;
+  --db-radius-lg:         12px;
+
+  /* Typography */
+  --db-font:      'DM Sans', sans-serif;
+  --db-font-mono: 'IBM Plex Mono', monospace;
+}
+
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background: var(--db-bg);
+  color: var(--db-text);
+  font-family: var(--db-font);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--db-surface3); border-radius: 2px; }
+
+/* ── Live pulse animation ─────────────────────────────────────────────────── */
+@keyframes db-pulse {
+  0%, 100% { transform: scale(1);   opacity: 0.3; }
+  50%       { transform: scale(1.6); opacity: 0;   }
+}
+
+/* ── Skeleton loader ──────────────────────────────────────────────────────── */
+@keyframes db-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.db-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--db-surface2) 25%,
+    var(--db-surface3) 50%,
+    var(--db-surface2) 75%
+  );
+  background-size: 800px 100%;
+  animation: db-shimmer 1.6s infinite linear;
+  border-radius: 4px;
+}
+
+/* ── Status pill ──────────────────────────────────────────────────────────── */
+.db-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-family: var(--db-font-mono);
+  font-weight: 500;
+}
+.db-pill--live    { background: var(--db-teal-dim);   color: var(--db-teal);   }
+.db-pill--draft   { background: var(--db-surface3);    color: var(--db-text-muted); }
+.db-pill--sold    { background: var(--db-amber-dim);  color: var(--db-amber);  }
+.db-pill--review  { background: var(--db-blue-dim);   color: var(--db-blue);   }
+
+.db-pill__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Utility: mono ────────────────────────────────────────────────────────── */
+.db-mono { font-family: var(--db-font-mono); }
