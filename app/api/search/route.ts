@@ -1,4 +1,3 @@
-// app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import type { PhotoAsset } from '../../dashboard/types';
