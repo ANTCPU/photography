@@ -1,13 +1,12 @@
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-import type { PhotoAsset } from '@/types';
+import type { PhotoAsset } from '../../dashboard/types';
 
-export const runtime = 'edge'; // fastest cold start
+export const runtime = 'edge';
 
 export async function GET(req: NextRequest) {
 
-  // CORS — allow antcpu.com/manda
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET',
@@ -24,7 +23,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Read assets from KV — same data as DashboardContext
     const assets: PhotoAsset[] = await kv.get('assets') ?? [];
 
     const results = assets.filter(asset =>
@@ -44,7 +42,7 @@ export async function GET(req: NextRequest) {
           title: asset.filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' '),
           category: asset.category,
           status: asset.status,
-          imageUrl: `https://antcpu.com/manda/images/${asset.filename}`,
+          thumbnailUrl: asset.thumbnailUrl ?? `https://antcpu.com/manda/images/${asset.filename}`,
           panel: asset.category.toLowerCase(),
           priceUsd: asset.priceUsd,
           antcoin: asset.antcoin,
