@@ -129,7 +129,7 @@ const DashboardContext = createContext<DashboardContextValue | null>(null);
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [metrics] = useState<DashboardMetrics>(SEED_METRICS);
   const [assets] = useState<PhotoAsset[]>(SEED_ASSETS);
-  const [uploads, setUploads] = useState<UploadItem[]>(SEED_UPLOADS);
+  const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
