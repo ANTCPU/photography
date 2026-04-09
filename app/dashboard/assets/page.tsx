@@ -1,12 +1,26 @@
 import Link from 'next/link';
 import { CATEGORIES } from '@/lib/categories';
+import type { PhotoAsset } from '../types';
 
 export const metadata = {
   title: 'Asset Library — Amanda Studio',
 };
 
-export default function AssetsPage() {
-  const assets: Asset[] = []; // TODO: wire to GET /api/assets
+// Fetches live from KV via /api/assets at request time
+async function getAssets(): Promise<PhotoAsset[]> {
+  try {
+    const res = await fetch('https://amandaland.vercel.app/api/assets', {
+      cache: 'no-store', // always fresh
+    });
+    const data = await res.json();
+    return data.assets ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function AssetsPage() {
+  const assets = await getAssets();
 
   return (
     <main style={{
@@ -30,7 +44,7 @@ export default function AssetsPage() {
             📁 Asset Library
           </h1>
           <p style={{ fontSize: 12, color: 'var(--db-text-muted)', fontFamily: 'var(--db-font-mono)' }}>
-            {assets.length === 0 ? 'No assets yet' : `${assets.length} assets`}
+            {assets.length === 0 ? 'No assets yet' : `${assets.length} asset${assets.length === 1 ? '' : 's'}`}
           </p>
         </div>
         <Link href="/dashboard" style={{
@@ -44,16 +58,21 @@ export default function AssetsPage() {
 
       {/* Category Filter Bar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        <button style={pill(true)}>All</button>
-        {CATEGORIES.map((cat) => (
-          <button key={cat.id} style={pill(false)}>
-            {cat.emoji} {cat.label}
-          </button>
-        ))}
+        <span style={pill(true)}>All ({assets.length})</span>
+        {CATEGORIES.map((cat) => {
+          const count = assets.filter(a =>
+            a.category.toLowerCase() === cat.label.toLowerCase()
+          ).length;
+          return (
+            <span key={cat.id} style={pill(false)}>
+              {cat.emoji} {cat.label} {count > 0 && `(${count})`}
+            </span>
+          );
+        })}
       </div>
 
       {/* Empty State */}
-      {assets.length === 0 && (
+      {assets.length === 0 ? (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', padding: '80px 24px',
@@ -74,23 +93,94 @@ export default function AssetsPage() {
             ⬆️ Go to Upload
           </Link>
         </div>
+      ) : (
+        /* Asset Grid */
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: 16,
+        }}>
+          {assets.map((asset) => (
+            <AssetCard key={asset.id} asset={asset} />
+          ))}
+        </div>
       )}
 
     </main>
   );
 }
 
-type Asset = {
-  id: string;
-  filename: string;
-  url: string;
-  category: string;
-  uploadedAt: string;
-};
+// ── Asset Card ──────────────────────────────────────────────────────────────
+
+function AssetCard({ asset }: { asset: PhotoAsset & { blobUrl?: string; uploadedAt?: string } }) {
+  const cat = CATEGORIES.find(c =>
+    c.label.toLowerCase() === asset.category.toLowerCase()
+  );
+  const imageUrl = asset.thumbnailUrl ?? asset.blobUrl;
+
+  return (
+    <div style={{
+      border: '1px solid var(--db-border)',
+      borderRadius: 8,
+      overflow: 'hidden',
+      background: 'var(--db-surface)',
+    }}>
+      {/* Thumbnail */}
+      <div style={{ aspectRatio: '1', background: 'var(--db-surface2)', overflow: 'hidden' }}>
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={asset.filename}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div style={{
+            width: '100%', height: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, color: 'var(--db-text-dim)',
+          }}>
+            📷
+          </div>
+        )}
+      </div>
+
+      {/* Meta */}
+      <div style={{ padding: '10px 12px' }}>
+        <p style={{
+          fontSize: 11, color: 'var(--db-text)',
+          fontFamily: 'var(--db-font-mono)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          marginBottom: 4,
+        }}>
+          {asset.filename}
+        </p>
+        <p style={{ fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' }}>
+          {cat ? `${cat.emoji} ${cat.label}` : asset.category}
+        </p>
+        <p style={{ fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)', marginTop: 2 }}>
+          {asset.meta}
+        </p>
+        {/* Status badge */}
+        <span style={{
+          display: 'inline-block', marginTop: 6,
+          fontSize: 9, fontFamily: 'var(--db-font-mono)',
+          padding: '2px 6px', borderRadius: 20,
+          background: asset.status === 'live' ? 'var(--db-teal-dim)' : 'var(--db-amber-dim)',
+          color: asset.status === 'live' ? 'var(--db-teal)' : 'var(--db-amber)',
+        }}>
+          {asset.status}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Style helpers ────────────────────────────────────────────────────────────
 
 function pill(active: boolean): React.CSSProperties {
   return {
-    padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
+    padding: '4px 12px', borderRadius: 20, cursor: 'default',
     border: `1px solid ${active ? 'var(--db-text)' : 'var(--db-border)'}`,
     background: active ? 'var(--db-text)' : 'transparent',
     color: active ? 'var(--db-bg)' : 'var(--db-text-dim)',
