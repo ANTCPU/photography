@@ -1,12 +1,10 @@
 // app/page.tsx
 // Amanda Photography Platform — Corporate Landing Page
-// Public-facing entry point for amandaland.vercel.app
+// Web-first, mobile-responsive secondary
 
 "use client"
 
 import { useEffect, useState } from "react"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 type PlatformStatus = {
   discordConnected: boolean
@@ -15,16 +13,36 @@ type PlatformStatus = {
   topCategory: string | null
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+type RecentEvent = {
+  id: string
+  type: string
+  label: string
+  meta: Record<string, string>
+  timestamp: string
+}
+
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
 
 export default function AmandaPlatformHome() {
   const [status, setStatus] = useState<PlatformStatus | null>(null)
+  const [events, setEvents] = useState<RecentEvent[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch("/api/stats")
       .then((r) => r.json())
-      .then((d) => setStatus(d.status))
+      .then((d) => {
+        setStatus(d.status)
+        setEvents(d.recentEvents ?? [])
+      })
       .catch(() =>
         setStatus({ discordConnected: false, totalEvents: 0, lastEvent: null, topCategory: null })
       )
@@ -32,62 +50,54 @@ export default function AmandaPlatformHome() {
   }, [])
 
   return (
-    <div style={styles.root}>
+    <div style={s.root}>
 
-      {/* ── Top Bar ── */}
-      <header style={styles.topbar}>
-        <div style={styles.topbarInner}>
-          <div style={styles.wordmark}>
-            <span style={styles.wordmarkAccent}>A</span>MANDA
-            <span style={styles.wordmarkDivider}>/</span>
-            <span style={styles.wordmarkSub}>PLATFORM</span>
+      {/* ── Topbar ── */}
+      <header style={s.topbar}>
+        <div style={s.topbarInner}>
+          <div style={s.wordmark}>
+            <span style={s.accent}>A</span>MANDA
+            <span style={s.dim}> / </span>
+            <span style={{ ...s.dim, fontSize: 10 }}>PLATFORM</span>
           </div>
-          <nav style={styles.topNav}>
-            <NavLink href="https://antcpu.com/manda" label="↗ Public Site" external />
-            <NavLink href="/dashboard" label="Dashboard" />
+          <nav style={s.topNav}>
+            <TopLink href="https://antcpu.com/manda" label="↗ Portfolio" external />
+            <TopLink href="/dashboard" label="Dashboard" />
           </nav>
         </div>
       </header>
 
       {/* ── Hero ── */}
-      <section style={styles.hero}>
-        <div style={styles.heroInner}>
-          <div style={styles.heroBadge}>PHOTOGRAPHY PLATFORM</div>
-          <h1 style={styles.heroTitle}>
+      <section style={s.hero}>
+        <div style={s.heroInner}>
+          <div style={s.badge}>PHOTOGRAPHY PLATFORM</div>
+          <h1 style={s.heroTitle}>
             Amanda<br />
-            <span style={styles.heroTitleAccent}>Photography</span>
+            <span style={s.accent}>Photography</span>
           </h1>
-          <p style={styles.heroSub}>
-            A professional platform for visual storytelling — culinary, lifestyle, and travel photography
-            powered by a modern serverless backend.
+          <p style={s.heroSub}>
+            A professional platform for visual storytelling — culinary, lifestyle,
+            and travel photography powered by a modern serverless backend.
           </p>
-          <div style={styles.heroActions}>
-            <HeroButton href="https://antcpu.com/manda" primary label="View Portfolio →" />
-            <HeroButton href="/dashboard" label="Studio Dashboard" />
+          <div style={s.heroActions}>
+            <Btn href="https://antcpu.com/manda" label="View Portfolio →" primary />
+            <Btn href="/dashboard" label="Studio Dashboard" />
           </div>
         </div>
-        <div style={styles.heroGrid} aria-hidden="true">
+        {/* Decorative grid */}
+        <div style={s.heroGrid} aria-hidden>
           {Array.from({ length: 24 }).map((_, i) => (
-            <div key={i} style={{
-              ...styles.heroGridCell,
-              opacity: Math.random() * 0.12 + 0.03,
-            }} />
+            <div key={i} style={s.heroCell} />
           ))}
         </div>
       </section>
 
-      {/* ── Platform Stats ── */}
-      <section style={styles.section}>
+      {/* ── Platform Status ── */}
+      <section style={s.section}>
         <SectionLabel>Platform Status</SectionLabel>
-        <div style={styles.statsGrid}>
-          <StatCard
-            label="Public Site"
-            value="Live"
-            sub="antcpu.com/manda"
-            accent="teal"
-            loading={false}
-            href="https://antcpu.com/manda"
-          />
+        <div style={s.statsGrid}>
+          <StatCard label="Public Site" value="Live" sub="antcpu.com/manda"
+            accent="teal" loading={false} href="https://antcpu.com/manda" />
           <StatCard
             label="Discord"
             value={loading ? "—" : status?.discordConnected ? "Connected" : "Offline"}
@@ -105,75 +115,112 @@ export default function AmandaPlatformHome() {
           <StatCard
             label="Top Category"
             value={loading ? "—" : status?.topCategory ?? "—"}
-            sub="Most viewed"
+            sub="Most uploaded"
             accent="purple"
             loading={loading}
           />
         </div>
       </section>
 
-      {/* ── Navigation Cards ── */}
-      <section style={styles.section}>
+      {/* ── Recent Events ── */}
+      <section style={s.section}>
+        <SectionLabel>Recent Activity</SectionLabel>
+        {loading ? (
+          <div style={s.emptyState}>Loading events···</div>
+        ) : events.length === 0 ? (
+          <div style={s.emptyState}>No events yet — activity will appear here as the platform is used</div>
+        ) : (
+          <div style={s.eventList}>
+            {events.slice(0, 6).map((e) => (
+              <div key={e.id} style={s.eventRow}>
+                <span style={s.eventLabel}>{e.label}</span>
+                <span style={s.eventMeta}>
+                  {Object.entries(e.meta ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                </span>
+                <span style={s.eventTime}>{timeAgo(e.timestamp)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Quick Access ── */}
+      <section style={s.section}>
         <SectionLabel>Quick Access</SectionLabel>
-        <div style={styles.navGrid}>
-          <NavCard
-            href="/dashboard"
-            icon="⬡"
-            title="Studio Dashboard"
+        <div style={s.navGrid}>
+          <NavCard href="/dashboard" icon="⬡" title="Studio Dashboard"
             desc="Upload assets, manage portfolio, monitor platform health and next steps."
-            accent
-          />
-          <NavCard
-            href="https://antcpu.com/manda"
-            icon="◎"
-            title="Public Portfolio"
+            accent />
+          <NavCard href="https://antcpu.com/manda" icon="◎" title="Public Portfolio"
             desc="The live photography site — culinary, lifestyle, and travel visual showcases."
-            external
-          />
-          <NavCard
-            href="/api/search?q=nature"
-            icon="◈"
-            title="Search API"
-            desc="Query the photo asset index by filename, category, EXIF, or metadata."
-          />
-          <NavCard
-            href="https://vercel.com/antcpu/amandaland"
-            icon="▲"
+            external />
+          <NavCard href="/dashboard" icon="◈" title="Search Assets"
+            desc="Query the photo asset index by filename, category, EXIF, or metadata." />
+          <NavCard href="https://vercel.com/antcpus-projects/photography" icon="▲"
             title="Vercel Deployments"
             desc="CI/CD pipeline, build logs, environment variables, and edge config."
-            external
+            external />
+        </div>
+      </section>
+
+      {/* ── API Reference ── */}
+      <section style={s.section}>
+        <SectionLabel>API Reference</SectionLabel>
+        <div style={s.apiGrid}>
+          <ApiRow
+            method="GET"
+            path="/api/search?q="
+            desc="Search photo assets by filename, category, EXIF or metadata"
+            example='{"query":"nature","count":1,"results":[...]}'
+          />
+          <ApiRow
+            method="POST"
+            path="/api/notify"
+            desc="Send a platform event to Discord and log it to KV"
+            example='{"type":"upload_complete","meta":{"filename":"shot.cr2","category":"Nature"}}'
+          />
+          <ApiRow
+            method="GET"
+            path="/api/stats"
+            desc="Read platform status — Discord health, event count, top category"
+            example='{"status":{"discordConnected":true,"totalEvents":4}}'
+          />
+          <ApiRow
+            method="POST"
+            path="/api/upload"
+            desc="Upload a photo asset to Vercel Blob, write metadata to KV"
+            example='FormData: file + category → {ok:true, blobUrl:"...", assetId:"..."}'
           />
         </div>
       </section>
 
-      {/* ── Platform Architecture ── */}
-      <section style={styles.section}>
+      {/* ── Architecture ── */}
+      <section style={s.section}>
         <SectionLabel>Architecture</SectionLabel>
-        <div style={styles.archGrid}>
+        <div style={s.archGrid}>
           <ArchRow layer="Frontend" tech="HTML / CSS / JS" host="antcpu.com/manda" status="live" />
           <ArchRow layer="Backend API" tech="Next.js · Edge Runtime" host="amandaland.vercel.app" status="live" />
-          <ArchRow layer="Database" tech="Vercel KV (Redis)" host="kv.vercel.com" status="live" />
-          <ArchRow layer="Storage CDN" tech="Vercel Blob / CDN" host="US-West" status="degraded" />
-          <ArchRow layer="Notifications" tech="Discord Webhook" host="discord.com" status={status?.discordConnected ? "live" : "offline"} />
-          <ArchRow layer="Source" tech="GitHub · main branch" host="github.com/ANTCPU/photography" status="live" />
+          <ArchRow layer="Database" tech="Upstash Redis (KV)" host="upstash.com" status="live" />
+          <ArchRow layer="File Storage" tech="Vercel Blob" host="vercel-storage.com" status="offline" />
+          <ArchRow layer="Notifications" tech="Discord Webhook" host="discord.com"
+            status={status?.discordConnected ? "live" : "offline"} />
+          <ArchRow layer="Source" tech="GitHub · main" host="github.com/ANTCPU/photography" status="live" />
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer style={styles.footer}>
-        <div style={styles.footerInner}>
-          <span style={styles.footerWordmark}>
-            <span style={styles.wordmarkAccent}>A</span>MANDA PHOTOGRAPHY
+      <footer style={s.footer}>
+        <div style={s.footerInner}>
+          <span style={s.footerMark}>
+            <span style={s.accent}>A</span>MANDA PHOTOGRAPHY
           </span>
-          <div style={styles.footerLinks}>
-            <FooterLink href="https://antcpu.com/manda" label="Public Site" />
-            <FooterLink href="/dashboard" label="Dashboard" />
-            <FooterLink href="/api/search?q=" label="API" />
-            <FooterLink href="https://github.com/ANTCPU/photography" label="GitHub" />
+          <div style={s.footerLinks}>
+            <FLink href="https://antcpu.com/manda" label="Portfolio" />
+            <FLink href="/dashboard" label="Dashboard" />
+            <FLink href="/api/stats" label="API" />
+            <FLink href="https://github.com/ANTCPU/photography" label="GitHub" />
           </div>
-          <span style={styles.footerMeta}>
-            © 2026 Antony Ciccone · amandaland.vercel.app
-          </span>
+          <span style={s.footerCopy}>© 2026 Antony Ciccone</span>
         </div>
       </footer>
 
@@ -181,86 +228,56 @@ export default function AmandaPlatformHome() {
   )
 }
 
-// ─── Sub-Components ───────────────────────────────────────────────────────────
+// ─── Components ───────────────────────────────────────────────────────────────
 
-function NavLink({ href, label, external }: { href: string; label: string; external?: boolean }) {
+function TopLink({ href, label, external }: { href: string; label: string; external?: boolean }) {
   return (
-    <a
-      href={href}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noreferrer" : undefined}
-      style={styles.topNavLink}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--db-accent, #c8f564)")}
+    <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}
+      style={s.topNavLink}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "#c8f564")}
       onMouseLeave={(e) => (e.currentTarget.style.color = "#7c8096")}
-    >
-      {label}
-    </a>
+    >{label}</a>
   )
 }
 
-function HeroButton({ href, label, primary }: { href: string; label: string; primary?: boolean }) {
+function Btn({ href, label, primary }: { href: string; label: string; primary?: boolean }) {
   return (
-    <a href={href} style={primary ? styles.heroBtnPrimary : styles.heroBtnSecondary}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.opacity = "0.85"
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.opacity = "1"
-      }}
-    >
-      {label}
-    </a>
+    <a href={href} style={primary ? s.btnPrimary : s.btnSecondary}
+      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+      onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+    >{label}</a>
   )
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={styles.sectionLabel}>{children}</div>
-  )
+  return <div style={s.sectionLabel}>{children}</div>
 }
 
-function StatCard({
-  label, value, sub, accent, loading, href
-}: {
+function StatCard({ label, value, sub, accent, loading, href }: {
   label: string; value: string; sub: string
   accent: "teal" | "blue" | "red" | "purple" | "amber"
   loading: boolean; href?: string
 }) {
-  const accentColors = {
-    teal:   "#34d6a8",
-    blue:   "#4da6ff",
-    red:    "#ff5e5e",
-    purple: "#b57bff",
-    amber:  "#f5a623",
-  }
-  const color = accentColors[accent]
+  const colors = { teal: "#34d6a8", blue: "#4da6ff", red: "#ff5e5e", purple: "#b57bff", amber: "#f5a623" }
+  const c = colors[accent]
   const inner = (
-    <div style={{ ...styles.statCard, borderTopColor: color }}>
-      <div style={{ ...styles.statValue, color: loading ? "#4a4f63" : color }}>
-        {loading ? "···" : value}
-      </div>
-      <div style={styles.statLabel}>{label}</div>
-      <div style={styles.statSub}>{sub}</div>
+    <div style={{ ...s.statCard, borderTopColor: c }}>
+      <div style={{ ...s.statValue, color: loading ? "#4a4f63" : c }}>{loading ? "···" : value}</div>
+      <div style={s.statLabel}>{label}</div>
+      <div style={s.statSub}>{sub}</div>
     </div>
   )
   return href ? <a href={href} style={{ textDecoration: "none" }}>{inner}</a> : inner
 }
 
-function NavCard({
-  href, icon, title, desc, accent, external
-}: {
+function NavCard({ href, icon, title, desc, accent, external }: {
   href: string; icon: string; title: string; desc: string; accent?: boolean; external?: boolean
 }) {
   return (
-    <a
-      href={href}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noreferrer" : undefined}
-      style={styles.navCard}
+    <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}
+      style={s.navCard}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = accent
-          ? "rgba(200,245,100,0.35)"
-          : "rgba(255,255,255,0.12)"
+        e.currentTarget.style.borderColor = accent ? "rgba(200,245,100,0.35)" : "rgba(255,255,255,0.12)"
         e.currentTarget.style.background = "#191d27"
       }}
       onMouseLeave={(e) => {
@@ -268,49 +285,58 @@ function NavCard({
         e.currentTarget.style.background = "#12151c"
       }}
     >
-      <div style={{ ...styles.navCardIcon, color: accent ? "#c8f564" : "#7c8096" }}>{icon}</div>
-      <div style={styles.navCardTitle}>{title}</div>
-      <div style={styles.navCardDesc}>{desc}</div>
-      <div style={{ ...styles.navCardArrow, color: accent ? "#c8f564" : "#4a4f63" }}>→</div>
+      <div style={{ ...s.navIcon, color: accent ? "#c8f564" : "#7c8096" }}>{icon}</div>
+      <div style={s.navTitle}>{title}</div>
+      <div style={s.navDesc}>{desc}</div>
+      <div style={{ ...s.navArrow, color: accent ? "#c8f564" : "#4a4f63" }}>→</div>
     </a>
   )
 }
 
-function ArchRow({
-  layer, tech, host, status
-}: {
-  layer: string; tech: string; host: string; status: "live" | "degraded" | "offline"
+function ApiRow({ method, path, desc, example }: {
+  method: "GET" | "POST"; path: string; desc: string; example: string
 }) {
-  const statusStyles = {
-    live:     { color: "#34d6a8", label: "● live" },
-    degraded: { color: "#f5a623", label: "◐ degraded" },
-    offline:  { color: "#ff5e5e", label: "○ offline" },
-  }
-  const s = statusStyles[status]
+  const methodColor = method === "GET" ? "#34d6a8" : "#f5a623"
   return (
-    <div style={styles.archRow}>
-      <span style={styles.archLayer}>{layer}</span>
-      <span style={styles.archTech}>{tech}</span>
-      <span style={styles.archHost}>{host}</span>
-      <span style={{ ...styles.archStatus, color: s.color }}>{s.label}</span>
+    <div style={s.apiRow}>
+      <div style={s.apiTop}>
+        <span style={{ ...s.apiMethod, color: methodColor, background: `${methodColor}15`,
+          border: `1px solid ${methodColor}30` }}>{method}</span>
+        <span style={s.apiPath}>{path}</span>
+      </div>
+      <div style={s.apiDesc}>{desc}</div>
+      <div style={s.apiExample}>{example}</div>
     </div>
   )
 }
 
-function FooterLink({ href, label }: { href: string; label: string }) {
+function ArchRow({ layer, tech, host, status }: {
+  layer: string; tech: string; host: string; status: "live" | "degraded" | "offline"
+}) {
+  const st = { live: { c: "#34d6a8", l: "● live" }, degraded: { c: "#f5a623", l: "◐ degraded" },
+    offline: { c: "#ff5e5e", l: "○ offline" } }[status]
   return (
-    <a href={href} style={styles.footerLink}
+    <div style={s.archRow}>
+      <span style={s.archLayer}>{layer}</span>
+      <span style={s.archTech}>{tech}</span>
+      <span style={s.archHost}>{host}</span>
+      <span style={{ ...s.archStatus, color: st.c }}>{st.l}</span>
+    </div>
+  )
+}
+
+function FLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a href={href} style={s.footerLink}
       onMouseEnter={(e) => (e.currentTarget.style.color = "#c8f564")}
       onMouseLeave={(e) => (e.currentTarget.style.color = "#4a4f63")}
-    >
-      {label}
-    </a>
+    >{label}</a>
   )
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles: Record<string, React.CSSProperties> = {
+const s: Record<string, React.CSSProperties> = {
   root: {
     minHeight: "100vh",
     background: "#0b0d11",
@@ -324,7 +350,7 @@ const styles: Record<string, React.CSSProperties> = {
   topbar: {
     borderBottom: "1px solid rgba(255,255,255,0.06)",
     background: "rgba(11,13,17,0.95)",
-    position: "sticky" as const,
+    position: "sticky",
     top: 0,
     zIndex: 100,
     backdropFilter: "blur(12px)",
@@ -332,46 +358,44 @@ const styles: Record<string, React.CSSProperties> = {
   topbarInner: {
     maxWidth: 1100,
     margin: "0 auto",
-    padding: "0 24px",
+    padding: "0 20px",
     height: 52,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
   },
   wordmark: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
     letterSpacing: "0.18em",
     color: "#e8eaf0",
     fontFamily: "'IBM Plex Mono', monospace",
   },
-  wordmarkAccent: { color: "#c8f564" },
-  wordmarkDivider: { color: "rgba(255,255,255,0.15)", margin: "0 8px" },
-  wordmarkSub: { color: "#4a4f63", fontSize: 11 },
-  topNav: { display: "flex", gap: 24, alignItems: "center" },
+  accent: { color: "#c8f564" },
+  dim: { color: "#4a4f63" },
+  topNav: { display: "flex", gap: 20, alignItems: "center" },
   topNavLink: {
     color: "#7c8096",
     textDecoration: "none",
     fontSize: 12,
     fontFamily: "'IBM Plex Mono', monospace",
     transition: "color 0.15s",
-    cursor: "pointer",
   },
 
   // Hero
   hero: {
-    position: "relative" as const,
+    position: "relative",
     overflow: "hidden",
     borderBottom: "1px solid rgba(255,255,255,0.06)",
-    padding: "80px 24px 72px",
+    padding: "64px 20px 56px",
   },
   heroInner: {
     maxWidth: 1100,
     margin: "0 auto",
-    position: "relative" as const,
+    position: "relative",
     zIndex: 2,
   },
-  heroBadge: {
+  badge: {
     display: "inline-block",
     fontSize: 10,
     fontFamily: "'IBM Plex Mono', monospace",
@@ -381,52 +405,49 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid rgba(200,245,100,0.2)",
     borderRadius: 20,
     padding: "4px 12px",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   heroTitle: {
-    fontSize: 56,
+    fontSize: "clamp(36px, 6vw, 56px)",
     fontWeight: 700,
     lineHeight: 1.05,
     letterSpacing: "-0.02em",
     color: "#e8eaf0",
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  heroTitleAccent: { color: "#c8f564" },
   heroSub: {
-    fontSize: 15,
+    fontSize: "clamp(13px, 2vw, 15px)",
     color: "#7c8096",
-    maxWidth: 520,
-    marginBottom: 36,
+    maxWidth: 500,
+    marginBottom: 32,
     lineHeight: 1.7,
   },
-  heroActions: { display: "flex", gap: 12, flexWrap: "wrap" as const },
-  heroBtnPrimary: {
+  heroActions: { display: "flex", gap: 10, flexWrap: "wrap" },
+  btnPrimary: {
     display: "inline-block",
     background: "#c8f564",
     color: "#0b0d11",
     fontWeight: 700,
     fontSize: 13,
-    padding: "12px 28px",
+    padding: "11px 24px",
     borderRadius: 8,
     textDecoration: "none",
     transition: "opacity 0.15s",
-    fontFamily: "'DM Sans', sans-serif",
   },
-  heroBtnSecondary: {
+  btnSecondary: {
     display: "inline-block",
     background: "transparent",
     color: "#e8eaf0",
     fontWeight: 500,
     fontSize: 13,
-    padding: "12px 28px",
+    padding: "11px 24px",
     borderRadius: 8,
     textDecoration: "none",
     border: "1px solid rgba(255,255,255,0.12)",
     transition: "opacity 0.15s",
-    fontFamily: "'DM Sans', sans-serif",
   },
   heroGrid: {
-    position: "absolute" as const,
+    position: "absolute",
     inset: 0,
     display: "grid",
     gridTemplateColumns: "repeat(8, 1fr)",
@@ -434,95 +455,158 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 1,
     pointerEvents: "none",
   },
-  heroGridCell: {
-    border: "1px solid rgba(200,245,100,0.15)",
-  },
+  heroCell: { border: "1px solid rgba(200,245,100,0.08)" },
 
   // Sections
   section: {
     maxWidth: 1100,
     margin: "0 auto",
-    padding: "48px 24px",
+    padding: "40px 20px",
     borderBottom: "1px solid rgba(255,255,255,0.04)",
   },
   sectionLabel: {
     fontSize: 10,
     fontFamily: "'IBM Plex Mono', monospace",
     letterSpacing: "0.15em",
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase",
     color: "#4a4f63",
-    marginBottom: 20,
+    marginBottom: 16,
   },
 
   // Stats
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-    gap: 16,
+    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+    gap: 12,
   },
   statCard: {
     background: "#12151c",
     border: "1px solid rgba(255,255,255,0.06)",
     borderTop: "2px solid",
     borderRadius: 10,
-    padding: "20px 20px 18px",
+    padding: "18px 18px 16px",
   },
   statValue: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: 700,
     fontFamily: "'IBM Plex Mono', monospace",
     marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 12,
-    color: "#e8eaf0",
-    fontWeight: 500,
-    marginBottom: 2,
+  statLabel: { fontSize: 12, color: "#e8eaf0", fontWeight: 500, marginBottom: 2 },
+  statSub: { fontSize: 10, color: "#4a4f63", fontFamily: "'IBM Plex Mono', monospace" },
+
+  // Events
+  eventList: {
+    background: "#12151c",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 10,
+    overflow: "hidden",
   },
-  statSub: {
+  eventRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 2fr auto",
+    gap: 12,
+    padding: "10px 16px",
+    borderBottom: "1px solid rgba(255,255,255,0.04)",
+    alignItems: "center",
+  },
+  eventLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#e8eaf0",
+    fontFamily: "'IBM Plex Mono', monospace",
+    whiteSpace: "nowrap" as const,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  eventMeta: {
+    fontSize: 10,
+    color: "#4a4f63",
+    fontFamily: "'IBM Plex Mono', monospace",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+  },
+  eventTime: {
+    fontSize: 10,
+    color: "#7c8096",
+    fontFamily: "'IBM Plex Mono', monospace",
+    whiteSpace: "nowrap" as const,
+  },
+  emptyState: {
     fontSize: 11,
     color: "#4a4f63",
     fontFamily: "'IBM Plex Mono', monospace",
+    padding: "16px 0",
   },
 
   // Nav Cards
   navGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-    gap: 16,
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gap: 12,
   },
   navCard: {
     background: "#12151c",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 10,
-    padding: "22px 22px 18px",
+    padding: "20px 20px 16px",
     textDecoration: "none",
     display: "flex",
-    flexDirection: "column" as const,
-    gap: 6,
+    flexDirection: "column",
+    gap: 5,
     transition: "border-color 0.15s, background 0.15s",
     cursor: "pointer",
   },
-  navCardIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-    fontFamily: "'IBM Plex Mono', monospace",
+  navIcon: { fontSize: 18, marginBottom: 4, fontFamily: "'IBM Plex Mono', monospace" },
+  navTitle: { fontSize: 13, fontWeight: 600, color: "#e8eaf0" },
+  navDesc: { fontSize: 11, color: "#7c8096", lineHeight: 1.6, flex: 1 },
+  navArrow: { fontSize: 13, marginTop: 8, fontFamily: "'IBM Plex Mono', monospace" },
+
+  // API Reference
+  apiGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+    gap: 12,
   },
-  navCardTitle: {
-    fontSize: 13,
-    fontWeight: 600,
+  apiRow: {
+    background: "#12151c",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 10,
+    padding: "16px 18px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  apiTop: { display: "flex", alignItems: "center", gap: 10 },
+  apiMethod: {
+    fontSize: 9,
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontWeight: 700,
+    letterSpacing: "0.1em",
+    padding: "2px 8px",
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  apiPath: {
+    fontSize: 11,
+    fontFamily: "'IBM Plex Mono', monospace",
     color: "#e8eaf0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
   },
-  navCardDesc: {
-    fontSize: 12,
-    color: "#7c8096",
-    lineHeight: 1.6,
-    flex: 1,
-  },
-  navCardArrow: {
-    fontSize: 14,
-    marginTop: 8,
+  apiDesc: { fontSize: 11, color: "#7c8096", lineHeight: 1.6 },
+  apiExample: {
+    fontSize: 10,
     fontFamily: "'IBM Plex Mono', monospace",
+    color: "#4a4f63",
+    background: "#0b0d11",
+    border: "1px solid rgba(255,255,255,0.04)",
+    borderRadius: 6,
+    padding: "8px 10px",
+    lineHeight: 1.6,
+    wordBreak: "break-all" as const,
   },
 
   // Architecture
@@ -534,59 +618,36 @@ const styles: Record<string, React.CSSProperties> = {
   },
   archRow: {
     display: "grid",
-    gridTemplateColumns: "140px 1fr 1fr 100px",
-    gap: 16,
-    padding: "12px 20px",
+    gridTemplateColumns: "120px 1fr 1fr 90px",
+    gap: 12,
+    padding: "11px 16px",
     borderBottom: "1px solid rgba(255,255,255,0.04)",
     alignItems: "center",
   },
-  archLayer: {
-    fontSize: 11,
-    fontWeight: 600,
-    color: "#e8eaf0",
-    fontFamily: "'IBM Plex Mono', monospace",
-  },
-  archTech: {
-    fontSize: 11,
-    color: "#7c8096",
-    fontFamily: "'IBM Plex Mono', monospace",
-  },
-  archHost: {
-    fontSize: 11,
-    color: "#4a4f63",
-    fontFamily: "'IBM Plex Mono', monospace",
-  },
-  archStatus: {
-    fontSize: 10,
-    fontFamily: "'IBM Plex Mono', monospace",
-    textAlign: "right" as const,
-  },
+  archLayer: { fontSize: 11, fontWeight: 600, color: "#e8eaf0", fontFamily: "'IBM Plex Mono', monospace" },
+  archTech: { fontSize: 11, color: "#7c8096", fontFamily: "'IBM Plex Mono', monospace" },
+  archHost: { fontSize: 10, color: "#4a4f63", fontFamily: "'IBM Plex Mono', monospace" },
+  archStatus: { fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", textAlign: "right" },
 
   // Footer
-  footer: {
-    borderTop: "1px solid rgba(255,255,255,0.06)",
-    padding: "28px 24px",
-  },
+  footer: { borderTop: "1px solid rgba(255,255,255,0.06)", padding: "24px 20px" },
   footerInner: {
     maxWidth: 1100,
     margin: "0 auto",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    flexWrap: "wrap" as const,
-    gap: 16,
+    flexWrap: "wrap",
+    gap: 12,
   },
-  footerWordmark: {
+  footerMark: {
     fontSize: 11,
     fontFamily: "'IBM Plex Mono', monospace",
     fontWeight: 700,
     letterSpacing: "0.15em",
     color: "#4a4f63",
   },
-  footerLinks: {
-    display: "flex",
-    gap: 20,
-  },
+  footerLinks: { display: "flex", gap: 16, flexWrap: "wrap" },
   footerLink: {
     fontSize: 11,
     fontFamily: "'IBM Plex Mono', monospace",
@@ -594,9 +655,5 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     transition: "color 0.15s",
   },
-  footerMeta: {
-    fontSize: 10,
-    fontFamily: "'IBM Plex Mono', monospace",
-    color: "#4a4f63",
-  },
+  footerCopy: { fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: "#4a4f63" },
 }
