@@ -3,10 +3,9 @@
 import { useCallback, useId, useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import type { UploadItem } from '../types';
+import { CATEGORY_LABELS, DEFAULT_CATEGORY } from '@/lib/categories';
 
 const ACCEPTED_EXTS = '.CR2,.NEF,.ARW,.DNG,.JPG,.JPEG,.TIFF,.RAF';
-
-const CATEGORIES = ['Culinary', 'Lifestyle', 'Travel', 'Nature', 'Urban', 'Portrait', 'Abstract'];
 
 const STATUS_COLORS: Record<string, string> = {
   done:      'var(--db-teal)',
@@ -25,7 +24,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default function UploadZone() {
   const { uploads, addUpload, updateUpload } = useDashboard();
   const inputId = useId();
-  const [category, setCategory] = useState('Culinary');
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [dragOver, setDragOver] = useState(false);
 
   const uploadFile = useCallback(
