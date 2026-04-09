@@ -3,6 +3,8 @@
 import { useDashboard } from './context/DashboardContext';
 import UploadZone from './components/UploadZone';
 import SearchPanel from './components/SearchPanel';
+import { useState } from 'react';
+
 
 // ── Placeholder stubs (replace one at a time as components are built) ──────
 
