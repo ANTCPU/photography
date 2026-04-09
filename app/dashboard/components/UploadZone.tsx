@@ -8,17 +8,17 @@ import { CATEGORY_LABELS, DEFAULT_CATEGORY } from '@/lib/categories';
 const ACCEPTED_EXTS = '.CR2,.NEF,.ARW,.DNG,.JPG,.JPEG,.TIFF,.RAF';
 
 const STATUS_COLORS: Record<string, string> = {
-  done:      'var(--db-teal)',
+  done: 'var(--db-teal)',
   uploading: 'var(--db-blue)',
-  queued:    'var(--db-text-dim)',
-  error:     'var(--db-red)',
+  queued: 'var(--db-text-dim)',
+  error: 'var(--db-red)',
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  done:      'done',
+  done: 'done',
   uploading: 'uploading',
-  queued:    'queued',
-  error:     'error',
+  queued: 'queued',
+  error: 'error',
 };
 
 export default function UploadZone() {
@@ -29,15 +29,12 @@ export default function UploadZone() {
 
   const uploadFile = useCallback(
     async (file: File, itemId: string) => {
-      // Mark as uploading
       updateUpload(itemId, { status: 'uploading', progress: 10 });
-
       try {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('category', category);
 
-        // Simulate progress ticks while fetch runs
         let progress = 10;
         const ticker = setInterval(() => {
           progress = Math.min(progress + 15, 85);
@@ -74,7 +71,6 @@ export default function UploadZone() {
           progress: 0,
         };
         addUpload(item);
-        // Start upload immediately
         uploadFile(file, item.id);
       });
     },
@@ -119,7 +115,7 @@ export default function UploadZone() {
             outline: 'none',
           }}
         >
-          {CATEGORIES.map((c) => (
+          {CATEGORY_LABELS.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
@@ -156,75 +152,39 @@ export default function UploadZone() {
         <input
           id={inputId}
           type="file"
-          accept={ACCEPTED_EXTS}
           multiple
+          accept={ACCEPTED_EXTS}
           style={{ display: 'none' }}
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <div style={{
-          fontSize: 24,
-          color: 'var(--db-accent)',
-          marginBottom: 8,
-        }}>
-          ↑
-        </div>
-        <div style={{
-          fontSize: 12,
-          color: 'var(--db-text-muted)',
-          marginBottom: 4,
-        }}>
+        <div style={{ fontSize: 20, color: 'var(--db-text-dim)', marginBottom: 8 }}>↑</div>
+        <div style={{ fontSize: 12, color: 'var(--db-text)', marginBottom: 4 }}>
           Drop RAW files, JPEGs, or batch folders
         </div>
-        <div style={{
-          fontSize: 10,
-          color: 'var(--db-text-dim)',
-          fontFamily: 'var(--db-font-mono)',
-        }}>
+        <div style={{ fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' }}>
           Supported: .CR2 .NEF .ARW .DNG .JPG .TIFF
         </div>
       </div>
 
       {/* Queue */}
-      <div style={{
-        background: 'var(--db-surface2)',
-        border: '1px solid var(--db-border)',
-        borderRadius: 'var(--db-radius)',
-        overflow: 'hidden',
-      }}>
+      <div style={{ background: 'var(--db-surface)', border: '1px solid var(--db-border)', borderRadius: 'var(--db-radius-lg)', overflow: 'hidden' }}>
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px 12px',
-          borderBottom: '1px solid var(--db-border)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '8px 12px', borderBottom: '1px solid var(--db-border)',
         }}>
-          <span style={{
-            fontSize: 10,
-            fontFamily: 'var(--db-font-mono)',
-            color: 'var(--db-text-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}>
+          <span style={{ fontSize: 10, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Upload Queue
           </span>
           <span style={{
-            fontSize: 10,
-            fontFamily: 'var(--db-font-mono)',
-            color: uploads.filter(u => u.status === 'done').length > 0
-              ? 'var(--db-teal)'
-              : 'var(--db-text-dim)',
+            fontSize: 10, fontFamily: 'var(--db-font-mono)',
+            color: uploads.filter(u => u.status === 'done').length > 0 ? 'var(--db-teal)' : 'var(--db-text-dim)',
           }}>
             {uploads.filter(u => u.status === 'done').length}/{uploads.length} done
           </span>
         </div>
 
         {uploads.length === 0 ? (
-          <div style={{
-            padding: '14px 12px',
-            fontSize: 11,
-            color: 'var(--db-text-dim)',
-            fontFamily: 'var(--db-font-mono)',
-          }}>
+          <div style={{ padding: '12px', fontSize: 11, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' }}>
             No uploads queued
           </div>
         ) : (
@@ -245,58 +205,27 @@ function UploadRow({ item }: { item: UploadItem }) {
 
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      padding: '8px 12px',
-      borderBottom: '1px solid var(--db-border)',
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '8px 12px', borderBottom: '1px solid var(--db-border)',
     }}>
-      {/* Icon */}
       <span style={{ fontSize: 14, flexShrink: 0 }}>📷</span>
-
-      {/* Filename */}
       <span style={{
-        flex: 1,
-        fontSize: 11,
-        color: 'var(--db-text)',
+        flex: 1, fontSize: 11, color: 'var(--db-text)',
         fontFamily: 'var(--db-font-mono)',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {item.filename}
       </span>
-
-      {/* Progress bar */}
       {item.status === 'uploading' && (
-        <div style={{
-          width: 60,
-          height: 3,
-          background: 'var(--db-surface3)',
-          borderRadius: 2,
-          overflow: 'hidden',
-          flexShrink: 0,
-        }}>
+        <div style={{ width: 60, height: 3, background: 'var(--db-surface3)', borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
           <div style={{
-            width: `${item.progress}%`,
-            height: '100%',
-            background: 'var(--db-blue)',
-            borderRadius: 2,
-            transition: 'width 0.3s ease',
+            width: `${item.progress}%`, height: '100%',
+            background: 'var(--db-blue)', borderRadius: 2, transition: 'width 0.3s ease',
           }} />
         </div>
       )}
-
-      {/* Status label */}
-      <span style={{
-        fontSize: 10,
-        fontFamily: 'var(--db-font-mono)',
-        color,
-        flexShrink: 0,
-      }}>
-        {item.status === 'uploading'
-          ? `${item.progress}%`
-          : STATUS_LABELS[item.status]}
+      <span style={{ fontSize: 10, fontFamily: 'var(--db-font-mono)', color, flexShrink: 0 }}>
+        {item.status === 'uploading' ? `${item.progress}%` : STATUS_LABELS[item.status]}
       </span>
     </div>
   );
