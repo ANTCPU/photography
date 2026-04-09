@@ -71,15 +71,43 @@ function WhatsNextPanel() {
 }
 
 function IdeasPanel() {
+  const [input, setInput] = useState('');
+  const [ideas, setIdeas] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('amanda-ideas') ?? '[]');
+    } catch { return []; }
+  });
+
+  function addIdea() {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    const updated = [trimmed, ...ideas];
+    setIdeas(updated);
+    localStorage.setItem('amanda-ideas', JSON.stringify(updated));
+    setInput('');
+  }
+
+  function removeIdea(i: number) {
+    const updated = ideas.filter((_, idx) => idx !== i);
+    setIdeas(updated);
+    localStorage.setItem('amanda-ideas', JSON.stringify(updated));
+  }
+
   return (
     <div style={{ ...panel, gridColumn: '1 / -1' }}>
       <PanelLabel>💡 Future Ideas</PanelLabel>
+
+      {/* Input row */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addIdea()}
           placeholder="Drop an idea here…"
           style={{
             flex: 1,
-            background: 'var(--db-surface3)',
+            background: 'var(--db-surface2)',
             border: '1px solid var(--db-border)',
             borderRadius: 6,
             color: 'var(--db-text)',
@@ -88,24 +116,74 @@ function IdeasPanel() {
             padding: '8px 12px',
             outline: 'none',
           }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(200,245,100,0.35)')}
+          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--db-border)')}
         />
-        <button style={{
-          background: 'var(--db-accent-dim)',
-          border: '1px solid rgba(200,245,100,0.25)',
-          borderRadius: 6,
-          color: 'var(--db-accent)',
-          fontFamily: 'var(--db-font-mono)',
-          fontSize: 12,
-          padding: '8px 16px',
-          cursor: 'pointer',
-        }}>+ Add</button>
+        <button
+          onClick={addIdea}
+          style={{
+            background: 'var(--db-accent-dim)',
+            border: '1px solid rgba(200,245,100,0.25)',
+            borderRadius: 6,
+            color: 'var(--db-accent)',
+            fontFamily: 'var(--db-font-mono)',
+            fontSize: 12,
+            padding: '8px 16px',
+            cursor: 'pointer',
+          }}
+        >
+          + Add
+        </button>
       </div>
-      <p style={{ color: 'var(--db-text-dim)', fontSize: 11, fontFamily: 'var(--db-font-mono)' }}>
-        — stub: ideas persist to localStorage or KV —
-      </p>
+
+      {/* Ideas list */}
+      {ideas.length === 0 ? (
+        <div style={{
+          fontSize: 11,
+          color: 'var(--db-text-dim)',
+          fontFamily: 'var(--db-font-mono)',
+        }}>
+          No ideas yet — add one above
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {ideas.map((idea, i) => (
+            <div key={i} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--db-surface2)',
+              border: '1px solid var(--db-border)',
+              borderRadius: 6,
+              padding: '8px 12px',
+            }}>
+              <span style={{ fontSize: 12, color: 'var(--db-text)' }}>
+                {idea}
+              </span>
+              <button
+                onClick={() => removeIdea(i)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--db-text-dim)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'var(--db-font-mono)',
+                  padding: '0 4px',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--db-red)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--db-text-dim)')}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
+
 
 function DashFooter() {
   return (
