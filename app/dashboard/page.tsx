@@ -2,33 +2,9 @@
 
 import { useDashboard } from './context/DashboardContext';
 import UploadZone from './components/UploadZone';
+import SearchPanel from './components/SearchPanel';
 
 // ── Placeholder stubs (replace one at a time as components are built) ──────
-function SearchPanel() {
-  return (
-    <div style={panel}>
-      <PanelLabel>🔍 Search Assets</PanelLabel>
-      <input
-        placeholder="Search by filename, category, EXIF…"
-        style={{
-          width: '100%',
-          background: 'var(--db-surface3)',
-          border: '1px solid var(--db-border)',
-          borderRadius: 6,
-          color: 'var(--db-text)',
-          fontFamily: 'var(--db-font-mono)',
-          fontSize: 12,
-          padding: '8px 12px',
-          outline: 'none',
-          marginBottom: 12,
-        }}
-      />
-      <p style={{ color: 'var(--db-text-dim)', fontSize: 11, fontFamily: 'var(--db-font-mono)' }}>
-        — stub: wire to /api/search —
-      </p>
-    </div>
-  );
-}
 
 function CategoryPanel() {
   const cats = [
