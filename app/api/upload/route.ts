@@ -1,12 +1,8 @@
 // app/api/upload/route.ts
-// Receives file from UploadZone → stores in Vercel Blob
-// → writes metadata to KV → pings Discord via /api/notify
-
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { kv } from '@vercel/kv';
 
-// NOTE: Must NOT use edge runtime — Blob requires Node.js runtime
 export const runtime = 'nodejs';
 
 const HEADERS = {
@@ -19,45 +15,61 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const file = formData.get('file') as File | null;
+  const category = (formData.get('category') as string) || 'Uncategorized';
+
+  if (!file) {
+    return NextResponse.json(
+      { error: 'No file provided' },
+      { status: 400, headers: HEADERS }
+    );
+  }
+
+  // ── 1. Upload to Blob ──────────────────────────────────────────────────
+  let blob;
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const category = (formData.get('category') as string) || 'Uncategorized';
-
-    if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400, headers: HEADERS }
-      );
-    }
-
-    // ── 1. Upload file to Vercel Blob ──────────────────────────────────────
-    const blob = await put(`assets/${category}/${file.name}`, file, {
+    blob = await put(`assets/${category}/${file.name}`, file, {
       access: 'public',
       addRandomSuffix: false,
     });
+  } catch (err) {
+    console.error('Blob upload failed:', err);
+    return NextResponse.json(
+      { error: 'Blob upload failed', detail: String(err) },
+      { status: 500, headers: HEADERS }
+    );
+  }
 
-    // ── 2. Build asset metadata ────────────────────────────────────────────
-    const asset = {
-      id: crypto.randomUUID(),
-      filename: file.name,
-      category,
-      status: 'draft',
-      blobUrl: blob.url,
-      thumbnailUrl: blob.url,
-      priceUsd: null,
-      antcoin: null,
-      meta: `${(file.size / (1024 * 1024)).toFixed(1)} MB · ${file.type}`,
-      exif: '',
-      uploadedAt: new Date().toISOString(),
-    };
+  // ── 2. Build metadata ──────────────────────────────────────────────────
+  const asset = {
+    id: crypto.randomUUID(),
+    filename: file.name,
+    category,
+    status: 'draft',
+    blobUrl: blob.url,
+    thumbnailUrl: blob.url,
+    priceUsd: null,
+    antcoin: null,
+    meta: `${(file.size / (1024 * 1024)).toFixed(1)} MB · ${file.type}`,
+    exif: '',
+    uploadedAt: new Date().toISOString(),
+  };
 
-    // ── 3. Write metadata to KV ────────────────────────────────────────────
-    // Append to assets array (used by /api/search)
+  // ── 3. Write to KV ─────────────────────────────────────────────────────
+  try {
     const existing: object[] = (await kv.get('assets')) ?? [];
     await kv.set('assets', [asset, ...existing]);
+  } catch (err) {
+    console.error('KV write failed:', err);
+    return NextResponse.json(
+      { error: 'KV write failed', detail: String(err), blobUrl: blob.url },
+      { status: 500, headers: HEADERS }
+    );
+  }
 
-    // ── 4. Ping Discord via /api/notify ────────────────────────────────────
+  // ── 4. Ping Discord ────────────────────────────────────────────────────
+  try {
     const baseUrl = req.nextUrl.origin;
     await fetch(`${baseUrl}/api/notify`, {
       method: 'POST',
@@ -72,22 +84,13 @@ export async function POST(req: NextRequest) {
         },
       }),
     });
-
-    return NextResponse.json(
-      {
-        ok: true,
-        assetId: asset.id,
-        blobUrl: blob.url,
-        filename: file.name,
-      },
-      { status: 200, headers: HEADERS }
-    );
-
   } catch (err) {
-    console.error('Upload error:', err);
-    return NextResponse.json(
-      { error: 'Upload failed' },
-      { status: 500, headers: HEADERS }
-    );
+    // Discord ping failing should not block the upload
+    console.error('Discord notify failed:', err);
   }
+
+  return NextResponse.json(
+    { ok: true, assetId: asset.id, blobUrl: blob.url, filename: file.name },
+    { status: 200, headers: HEADERS }
+  );
 }
