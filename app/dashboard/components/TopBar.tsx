@@ -1,107 +1,94 @@
 'use client';
 
-import { useDashboard } from '../context/DashboardContext';
+import { useEffect, useState } from 'react';
 
-interface StatusBadge {
-  label: string;
-  color: 'teal' | 'amber' | 'red' | 'blue';
-}
-
-const SYSTEM_BADGES: StatusBadge[] = [
-  { label: 'Vercel: Live',   color: 'teal'  },
-  { label: 'DB Connected',   color: 'teal'  },
-  { label: '3 Pending',      color: 'amber' },
-];
-
-const DOT_COLORS: Record<StatusBadge['color'], string> = {
-  teal:  'var(--db-teal)',
-  amber: 'var(--db-amber)',
-  red:   'var(--db-red)',
-  blue:  'var(--db-blue)',
+type Stats = {
+  discordConnected: boolean;
+  totalEvents: number;
+  topCategory: string | null;
 };
 
 export default function TopBar() {
-  const { activeSection, hasUnsavedChanges } = useDashboard();
+  const [stats, setStats] = useState<Stats | null>(null);
 
-  const sectionLabel = activeSection.charAt(0).toUpperCase() + activeSection.slice(1);
+  useEffect(() => {
+    fetch('/api/stats')
+      .then((r) => r.json())
+      .then((d) => setStats(d.status))
+      .catch(() => setStats(null));
+  }, []);
+
+  const badges = stats ? [
+    {
+      label: stats.discordConnected ? 'Discord: Live' : 'Discord: Offline',
+      color: stats.discordConnected ? 'var(--db-teal)' : 'var(--db-red)',
+    },
+    {
+      label: `${stats.totalEvents} Events`,
+      color: 'var(--db-blue)',
+    },
+    {
+      label: stats.topCategory ? `Top: ${stats.topCategory}` : 'No Activity',
+      color: 'var(--db-amber)',
+    },
+  ] : [
+    { label: '···', color: 'var(--db-text-dim)' },
+  ];
 
   return (
-    <header
-      style={{
-        height: 'var(--db-topbar-h)',
-        background: 'var(--db-surface)',
-        borderBottom: '1px solid var(--db-border)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 24px',
-        gap: 8,
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-        flexShrink: 0,
-      }}
-    >
-      {/* Breadcrumb */}
-      <span
-        style={{
-          fontSize: 12,
-          color: 'var(--db-text-dim)',
-          fontFamily: 'var(--db-font-mono)',
-        }}
-      >
-        dashboard
-      </span>
-      <span style={{ color: 'var(--db-text-dim)', fontSize: 12 }}>/</span>
-      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--db-text)' }}>
-        {sectionLabel}
-      </span>
+    <div style={{
+      height: 'var(--db-topbar-h)',
+      borderBottom: '1px solid var(--db-border)',
+      background: 'var(--db-surface)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 20px',
+      gap: 12,
+      flexShrink: 0,
+    }}>
 
-      {/* Unsaved indicator */}
-      {hasUnsavedChanges && (
-        <span
-          style={{
+      {/* Left — wordmark */}
+      <div style={{
+        fontSize: 12,
+        fontWeight: 700,
+        fontFamily: 'var(--db-font-mono)',
+        letterSpacing: '0.12em',
+        color: 'var(--db-text)',
+      }}>
+        <span style={{ color: 'var(--db-accent)' }}>A</span>MANDA
+        <span style={{ color: 'var(--db-text-dim)', margin: '0 6px' }}>/</span>
+        <span style={{ color: 'var(--db-text-dim)', fontSize: 10 }}>STUDIO</span>
+      </div>
+
+      {/* Right — live badges */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {badges.map((b) => (
+          <span key={b.label} style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
             fontSize: 10,
-            color: 'var(--db-amber)',
             fontFamily: 'var(--db-font-mono)',
-            marginLeft: 4,
-          }}
-        >
-          ● unsaved
-        </span>
-      )}
-
-      {/* Right: status badges */}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        {SYSTEM_BADGES.map((badge) => (
-          <div
-            key={badge.label}
-            style={{
-              background: 'var(--db-surface3)',
-              border: '1px solid var(--db-border-accent)',
-              borderRadius: 'var(--db-radius)',
-              padding: '4px 10px',
-              fontSize: 11,
-              color: 'var(--db-text-muted)',
-              fontFamily: 'var(--db-font-mono)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: DOT_COLORS[badge.color],
-                flexShrink: 0,
-              }}
-            />
-            {badge.label}
-          </div>
+            color: b.color,
+            background: `${b.color}18`,
+            border: `1px solid ${b.color}30`,
+            borderRadius: 20,
+            padding: '3px 10px',
+            whiteSpace: 'nowrap',
+          }}>
+            <span style={{
+              width: 5, height: 5,
+              borderRadius: '50%',
+              background: b.color,
+              display: 'inline-block',
+              flexShrink: 0,
+            }} />
+            {b.label}
+          </span>
         ))}
       </div>
-    </header>
+
+    </div>
   );
 }
