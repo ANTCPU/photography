@@ -4,30 +4,29 @@ import { useDashboard } from './context/DashboardContext';
 import UploadZone from './components/UploadZone';
 import SearchPanel from './components/SearchPanel';
 import { useState } from 'react';
+import { CATEGORIES } from '@/lib/categories';
 
 
 // ── Placeholder stubs (replace one at a time as components are built) ──────
-
 function CategoryPanel() {
-  const cats = [
-    { name: 'Culinary', status: 'coming soon' },
-    { name: 'Lifestyle', status: 'coming soon' },
-    { name: 'Travel',   status: 'coming soon' },
-  ];
   return (
     <div style={panel}>
       <PanelLabel>📂 Categories</PanelLabel>
-      {cats.map((c) => (
-        <div key={c.name} style={{
+      {CATEGORIES.map((c) => (
+        <div key={c.id} style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '8px 0', borderBottom: '1px solid var(--db-border)',
         }}>
-          <span style={{ color: 'var(--db-text)', fontSize: 12 }}>{c.name}</span>
+          <span style={{ color: 'var(--db-text)', fontSize: 12 }}>
+            {c.emoji} {c.label}
+          </span>
           <span style={{
             fontSize: 10, fontFamily: 'var(--db-font-mono)',
             color: 'var(--db-amber)', background: 'var(--db-amber-dim)',
             padding: '2px 8px', borderRadius: 20,
-          }}>{c.status}</span>
+          }}>
+            coming soon
+          </span>
         </div>
       ))}
       <p style={{ color: 'var(--db-text-dim)', fontSize: 11, fontFamily: 'var(--db-font-mono)', marginTop: 12 }}>
@@ -36,6 +35,7 @@ function CategoryPanel() {
     </div>
   );
 }
+
 
 function WhatsNextPanel() {
   const items = [
