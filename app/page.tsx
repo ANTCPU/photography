@@ -201,7 +201,7 @@ export default function AmandaPlatformHome() {
           <ArchRow layer="Frontend" tech="HTML / CSS / JS" host="antcpu.com/manda" status="live" />
           <ArchRow layer="Backend API" tech="Next.js · Edge Runtime" host="amandaland.vercel.app" status="live" />
           <ArchRow layer="Database" tech="Upstash Redis (KV)" host="upstash.com" status="live" />
-          <ArchRow layer="File Storage" tech="Vercel Blob" host="vercel-storage.com" status="offline" />
+          <ArchRow layer="File Storage" tech="Vercel Blob" host="vercel-storage.com" status="live" />
           <ArchRow layer="Notifications" tech="Discord Webhook" host="discord.com"
             status={status?.discordConnected ? "live" : "offline"} />
           <ArchRow layer="Source" tech="GitHub · main" host="github.com/ANTCPU/photography" status="live" />
