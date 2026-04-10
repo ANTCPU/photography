@@ -2,9 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { kv } from '@vercel/kv';
-export const runtime = 'nodejs';
 
-const kv = Redis.fromEnv();
+export const runtime = 'nodejs';
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
