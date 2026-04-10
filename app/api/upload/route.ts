@@ -1,8 +1,7 @@
 // app/api/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
-import { Redis } from '@upstash/redis';
-
+import { kv } from '@vercel/kv';
 export const runtime = 'nodejs';
 
 const kv = Redis.fromEnv();
