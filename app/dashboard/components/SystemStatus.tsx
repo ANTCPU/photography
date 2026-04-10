@@ -56,8 +56,8 @@ export default function SystemStatus() {
         },
         {
           label: 'Storage CDN',
-          status: 'degraded',
-          detail: 'Slowdown: US-West',
+          status: 'operational',
+          detail: 'Vercel Blob connected',
         },
         {
           label: 'Search API',
