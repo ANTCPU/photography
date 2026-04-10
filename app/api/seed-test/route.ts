@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 export const runtime = 'edge';
+
+const kv = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
 
 export async function GET() {
   const testAsset = {
@@ -19,7 +24,7 @@ export async function GET() {
   };
 
   try {
-    const existing: object[] = (await kv.get('assets')) ?? [];
+    const existing = (await kv.get<object[]>('assets')) ?? [];
     await kv.set('assets', [testAsset, ...existing]);
     return NextResponse.json({ ok: true, asset: testAsset });
   } catch (err) {
