@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-import type { PhotoAsset } from '../../dashboard/types';
 
 export const runtime = 'edge';
 
@@ -12,7 +11,7 @@ const HEADERS = {
 
 export async function GET() {
   try {
-    const assets: PhotoAsset[] = (await kv.get('assets')) ?? [];
+    const assets = (await kv.get<object[]>('assets')) ?? [];
     return NextResponse.json(
       { count: assets.length, assets },
       { status: 200, headers: HEADERS }
@@ -20,7 +19,7 @@ export async function GET() {
   } catch (err) {
     console.error('Assets fetch error:', err);
     return NextResponse.json(
-      { error: 'Failed to fetch assets' },
+      { error: 'Failed to fetch assets', detail: String(err) },
       { status: 500, headers: HEADERS }
     );
   }
