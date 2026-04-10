@@ -1,9 +1,11 @@
 // app/api/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 export const runtime = 'nodejs';
+
+const kv = Redis.fromEnv();
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -85,7 +87,6 @@ export async function POST(req: NextRequest) {
       }),
     });
   } catch (err) {
-    // Discord ping failing should not block the upload
     console.error('Discord notify failed:', err);
   }
 
