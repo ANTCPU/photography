@@ -1,3 +1,4 @@
+// checkpoint: landing cleaned ✅
 // app/page.tsx
 // Amanda Photography Platform — Landing Page (Cleaned)
 "use client"
