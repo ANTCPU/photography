@@ -9,9 +9,10 @@ export const PLATFORM = {
 } as const
 
 export const PLACEHOLDERS = {
-  profile:   'https://amandaland.vercel.app/api/placeholders?type=profile',
-  banner:    'https://amandaland.vercel.app/api/placeholders?type=banner',
-  thumbnail: 'https://amandaland.vercel.app/api/placeholders?type=thumbnail',
+  // Real images — uploaded through Amanda platform itself ✅
+  profile:   'https://w9cysoaxfshj0nmr.public.blob.vercel-storage.com/assets/Portrait/profile.png',
+  banner:    'https://w9cysoaxfshj0nmr.public.blob.vercel-storage.com/assets/Lifestyle/banner.png',
+  thumbnail: 'https://w9cysoaxfshj0nmr.public.blob.vercel-storage.com/assets/Portrait/profile.png',
 } as const
 
 export const SOCIAL_SIZES = {
