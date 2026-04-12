@@ -55,7 +55,6 @@ export async function GET(req: NextRequest) {
           status:       asset.status,
           // Always returns a valid image URL — never null
           thumbnailUrl: asset.thumbnailUrl ?? PLACEHOLDERS.thumbnail,
-          blobUrl:      asset.blobUrl      ?? PLACEHOLDERS.thumbnail,
           panel:        asset.category.toLowerCase(),
           priceUsd:     asset.priceUsd,
           antcoin:      asset.antcoin,
