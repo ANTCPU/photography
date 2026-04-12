@@ -9,9 +9,9 @@ export const PLATFORM = {
 } as const
 
 export const PLACEHOLDERS = {
-  profile:   'https://amandaland.vercel.app/placeholders/profile.png',  // 400×400
-  banner:    'https://amandaland.vercel.app/placeholders/banner.png',   // 1500×500
-  thumbnail: 'https://amandaland.vercel.app/placeholders/profile.png',  // square fallback
+  profile:   'https://amandaland.vercel.app/api/placeholders?type=profile',
+  banner:    'https://amandaland.vercel.app/api/placeholders?type=banner',
+  thumbnail: 'https://amandaland.vercel.app/api/placeholders?type=thumbnail',
 } as const
 
 export const SOCIAL_SIZES = {
