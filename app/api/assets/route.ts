@@ -18,7 +18,7 @@ const HEADERS = {
 
 export async function GET() {
   try {
-    const assets = (await kv.get('assets')) ?? []
+    const assets = ((await kv.get('assets')) ?? []) as any[]
 
     return NextResponse.json(
       {
