@@ -1,27 +1,36 @@
 // app/api/placeholders/route.ts
-// Generates placeholder images as SVG→PNG on the fly
-// No binary files needed in the repo
-
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
 
 function makeSVG(w: number, h: number, label: string): string {
-  const fontSize = Math.min(w, h) * 0.08
-  const subSize  = fontSize * 0.5
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-    <rect width="${w}" height="${h}" fill="#0b0d11"/>
-    <rect x="1" y="1" width="${w-2}" height="${h-2}" fill="none" stroke="#c8f564" stroke-width="1" stroke-opacity="0.2"/>
-    <text x="${w/2}" y="${h/2 - fontSize*0.6}" 
-      font-family="monospace" font-size="${fontSize}" font-weight="bold"
-      fill="#c8f564" text-anchor="middle" dominant-baseline="middle">A</text>
-    <text x="${w/2}" y="${h/2 + fontSize*0.8}" 
-      font-family="monospace" font-size="${subSize}"
-      fill="#4a4f63" text-anchor="middle" dominant-baseline="middle">${label}</text>
-    <text x="${w/2}" y="${h - subSize}" 
-      font-family="monospace" font-size="${subSize * 0.8}"
-      fill="#4a4f63" text-anchor="middle" dominant-baseline="middle">${w} × ${h}</text>
-  </svg>`
+  const fs  = Math.round(Math.min(w, h) * 0.08)
+  const sub = Math.round(fs * 0.5)
+  const cx  = Math.round(w / 2)
+  const cy  = Math.round(h / 2)
+
+  const parts = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<svg xmlns="http://www.w3.org/2000/svg"',
+    '  width="' + w + '" height="' + h + '"',
+    '  viewBox="0 0 ' + w + ' ' + h + '">',
+    '<rect width="' + w + '" height="' + h + '" fill="#0b0d11"/>',
+    '<rect x="2" y="2"',
+    '  width="' + (w - 4) + '" height="' + (h - 4) + '"',
+    '  fill="none" stroke="#c8f564" stroke-width="1" stroke-opacity="0.15"/>',
+    '<text x="' + cx + '" y="' + (cy - fs) + '"',
+    '  font-family="monospace" font-size="' + fs + '" font-weight="bold"',
+    '  fill="#c8f564" text-anchor="middle" dominant-baseline="middle">A</text>',
+    '<text x="' + cx + '" y="' + (cy + Math.round(fs * 0.4)) + '"',
+    '  font-family="monospace" font-size="' + sub + '"',
+    '  fill="#7c8096" text-anchor="middle" dominant-baseline="middle">' + label + '</text>',
+    '<text x="' + cx + '" y="' + (h - sub) + '"',
+    '  font-family="monospace" font-size="' + Math.round(sub * 0.8) + '"',
+    '  fill="#4a4f63" text-anchor="middle" dominant-baseline="middle">' + w + ' x ' + h + '</text>',
+    '</svg>',
+  ]
+
+  return parts.join('\n')
 }
 
 export async function GET(req: NextRequest) {
