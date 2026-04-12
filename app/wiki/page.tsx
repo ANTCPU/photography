@@ -1,3 +1,4 @@
+'use client'
 // app/wiki/page.tsx
 export default function WikiIndex() {
   return (
