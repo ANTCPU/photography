@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
+import { PLACEHOLDERS } from '@/lib/constants';
 
 interface NavItem {
   id: string;
@@ -24,12 +25,17 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function Sidebar() {
-  const { sidebarCollapsed, setSidebarCollapsed, activeSection, setActiveSection, metrics } =
-    useDashboard();
+  const {
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    activeSection,
+    setActiveSection,
+    metrics,
+  } = useDashboard();
 
   // Live-tick the Antcoin balance for the sidebar widget
   const [liveBalance, setLiveBalance] = useState(metrics?.antcoin.balance ?? 0);
-  const [liveDelta, setLiveDelta] = useState(0);
+  const [liveDelta,   setLiveDelta]   = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -43,205 +49,158 @@ export default function Sidebar() {
   }, []);
 
   const sectionLabels: Record<string, string> = {
-    core: 'Core',
+    core:    'Core',
     antcoin: 'Antcoin',
-    system: 'System',
+    system:  'System',
   };
 
   const grouped = (Object.keys(sectionLabels) as NavItem['section'][]).map((sec) => ({
-    key: sec,
+    key:   sec,
     label: sectionLabels[sec],
     items: NAV_ITEMS.filter((n) => n.section === sec),
   }));
 
+  const w = sidebarCollapsed ? 56 : 200;
+
   return (
-    <aside
-      style={{
-        width: sidebarCollapsed ? 'var(--db-sidebar-collapsed)' : 'var(--db-sidebar-w)',
-        minHeight: '100vh',
-        background: 'var(--db-surface)',
-        borderRight: '1px solid var(--db-border)',
+    <aside style={{
+      width: w, minWidth: w, maxWidth: w,
+      background: 'var(--db-surface)',
+      borderRight: '1px solid var(--db-border)',
+      display: 'flex', flexDirection: 'column',
+      height: '100vh', position: 'sticky', top: 0,
+      transition: 'width 0.2s, min-width 0.2s',
+      overflow: 'hidden', zIndex: 10,
+    }}>
+
+      {/* ── Profile ── */}
+      <div style={{
+        padding: sidebarCollapsed ? '16px 0' : '16px 14px',
+        borderBottom: '1px solid var(--db-border)',
         display: 'flex',
-        flexDirection: 'column',
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        transition: 'width 0.22s cubic-bezier(.4,0,.2,1)',
-        flexShrink: 0,
-        zIndex: 50,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: '16px 14px 12px',
-          borderBottom: '1px solid var(--db-border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          position: 'relative',
-          background:
-            'linear-gradient(135deg, rgba(200,245,100,0.05) 0%, transparent 60%)',
-          flexShrink: 0,
-        }}
-      >
-        {/* Logo mark */}
-        <div
+        flexDirection: sidebarCollapsed ? 'column' : 'row',
+        alignItems: 'center',
+        gap: 10,
+      }}>
+        {/* Avatar — profile.png */}
+        <img
+          src={PLACEHOLDERS.profile}
+          alt="Amanda"
           style={{
-            width: 28,
-            height: 28,
-            background: 'var(--db-accent)',
-            borderRadius: 6,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'var(--db-font-mono)',
-            fontSize: 11,
-            fontWeight: 500,
-            color: '#000',
-            flexShrink: 0,
-            letterSpacing: '-0.5px',
-          }}
-        >
-          AP
-        </div>
-
-        {!sidebarCollapsed && (
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              color: 'var(--db-text-muted)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Amanda Studio
-          </span>
-        )}
-
-        {/* Collapse button */}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          aria-label="Toggle sidebar"
-          style={{
-            position: 'absolute',
-            right: -10,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 20,
-            height: 20,
-            background: 'var(--db-surface2)',
-            border: '1px solid var(--db-border-accent)',
+            width: 32, height: 32,
             borderRadius: '50%',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--db-text-muted)',
-            fontSize: 9,
-            zIndex: 10,
+            objectFit: 'cover',
+            flexShrink: 0,
+            border: '1px solid rgba(200,245,100,0.25)',
           }}
-        >
-          {sidebarCollapsed ? '▶' : '◀'}
-        </button>
-      </div>
+        />
 
-      {/* Live status row */}
-      <div
-        style={{
-          padding: '8px 14px',
-          borderBottom: '1px solid var(--db-border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          flexShrink: 0,
-        }}
-      >
-        <LiveDot />
+        {/* Name + handle — hidden when collapsed */}
         {!sidebarCollapsed && (
-          <span
-            style={{
+          <div style={{ overflow: 'hidden' }}>
+            <div style={{
+              fontSize: 12, fontWeight: 600,
+              color: 'var(--db-text)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              Amanda
+            </div>
+            <div style={{
               fontSize: 10,
-              color: 'var(--db-teal)',
               fontFamily: 'var(--db-font-mono)',
-              fontWeight: 500,
-              letterSpacing: '0.05em',
+              color: 'var(--db-text-dim)',
               whiteSpace: 'nowrap',
+            }}>
+              @antcpu
+            </div>
+          </div>
+        )}
+
+        {/* Collapse toggle — pushed to right when expanded */}
+        {!sidebarCollapsed && (
+          <button
+            onClick={() => setSidebarCollapsed(true)}
+            style={{
+              marginLeft: 'auto', background: 'none', border: 'none',
+              color: 'var(--db-text-dim)', cursor: 'pointer', fontSize: 14,
+              padding: '2px 4px', lineHeight: 1,
             }}
+            title="Collapse sidebar"
           >
-            SYSTEM LIVE
-          </span>
+            ‹
+          </button>
+        )}
+        {sidebarCollapsed && (
+          <button
+            onClick={() => setSidebarCollapsed(false)}
+            style={{
+              background: 'none', border: 'none',
+              color: 'var(--db-text-dim)', cursor: 'pointer', fontSize: 14,
+              padding: '2px 4px', lineHeight: 1,
+            }}
+            title="Expand sidebar"
+          >
+            ›
+          </button>
         )}
       </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '8px 0', overflowY: 'auto', overflowX: 'hidden' }}>
+      {/* ── Nav ── */}
+      <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {grouped.map(({ key, label, items }) => (
-          <div key={key}>
+          <div key={key} style={{ marginBottom: 4 }}>
+            {/* Section label — hidden when collapsed */}
             {!sidebarCollapsed && (
-              <div
-                style={{
-                  fontSize: 9,
-                  fontWeight: 600,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: 'var(--db-text-dim)',
-                  padding: '12px 14px 4px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
+              <div style={{
+                fontSize: 9, fontFamily: 'var(--db-font-mono)',
+                letterSpacing: '0.12em', textTransform: 'uppercase',
+                color: 'var(--db-text-dim)', padding: '8px 14px 4px',
+              }}>
                 {label}
               </div>
             )}
             {items.map((item) => {
-              const isActive = activeSection === item.id;
+              const active = activeSection === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
+                  title={sidebarCollapsed ? item.label : undefined}
                   style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '8px 14px',
-                    cursor: 'pointer',
-                    background: isActive ? 'var(--db-accent-dim)' : 'transparent',
-                    color: isActive ? 'var(--db-accent)' : 'var(--db-text-muted)',
+                    width: '100%', display: 'flex', alignItems: 'center',
+                    gap: 10, padding: sidebarCollapsed ? '9px 0' : '9px 14px',
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    background: active ? 'rgba(200,245,100,0.07)' : 'none',
                     border: 'none',
-                    borderLeft: isActive ? '2px solid var(--db-accent)' : '2px solid transparent',
-                    textAlign: 'left',
-                    whiteSpace: 'nowrap',
-                    fontFamily: 'var(--db-font)',
-                    fontSize: 12,
-                    transition: 'background 0.12s, color 0.12s',
+                    borderLeft: active ? '2px solid #c8f564' : '2px solid transparent',
+                    cursor: 'pointer', transition: 'background 0.15s',
                   }}
                 >
-                  <span style={{ width: 16, textAlign: 'center', flexShrink: 0 }}>
+                  <span style={{
+                    fontSize: 14, lineHeight: 1,
+                    color: active ? 'var(--db-accent)' : 'var(--db-text-dim)',
+                    fontFamily: 'var(--db-font-mono)',
+                  }}>
                     {item.icon}
                   </span>
                   {!sidebarCollapsed && (
-                    <>
-                      <span>{item.label}</span>
-                      {item.badge && (
-                        <span
-                          style={{
-                            marginLeft: 'auto',
-                            background: 'var(--db-red-dim)',
-                            color: 'var(--db-red)',
-                            borderRadius: 10,
-                            padding: '1px 6px',
-                            fontSize: 10,
-                            fontFamily: 'var(--db-font-mono)',
-                          }}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </>
+                    <span style={{
+                      fontSize: 12, color: active ? 'var(--db-text)' : 'var(--db-text-muted)',
+                      fontWeight: active ? 600 : 400, flex: 1, textAlign: 'left',
+                    }}>
+                      {item.label}
+                    </span>
+                  )}
+                  {!sidebarCollapsed && item.badge && (
+                    <span style={{
+                      fontSize: 9, fontFamily: 'var(--db-font-mono)',
+                      background: 'rgba(200,245,100,0.12)',
+                      color: 'var(--db-accent)',
+                      border: '1px solid rgba(200,245,100,0.2)',
+                      borderRadius: 10, padding: '1px 6px',
+                    }}>
+                      {item.badge}
+                    </span>
                   )}
                 </button>
               );
@@ -250,84 +209,49 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Antcoin mini widget */}
+      {/* ── Antcoin Widget ── */}
       {!sidebarCollapsed && (
-        <div
-          style={{
-            borderTop: '1px solid var(--db-border)',
-            padding: '12px 14px',
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--db-text-dim)',
-              marginBottom: 6,
-            }}
-          >
-            Antcoin Balance
+        <div style={{
+          borderTop: '1px solid var(--db-border)',
+          padding: '12px 14px',
+        }}>
+          <div style={{
+            fontSize: 9, fontFamily: 'var(--db-font-mono)',
+            letterSpacing: '0.12em', color: 'var(--db-text-dim)',
+            textTransform: 'uppercase', marginBottom: 6,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <LiveDot />
+            Antcoin
           </div>
-          <div
-            style={{
-              fontFamily: 'var(--db-font-mono)',
-              fontSize: 18,
-              fontWeight: 500,
-              color: 'var(--db-amber)',
-              letterSpacing: '-0.5px',
-            }}
-          >
-            {liveBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div style={{
+            fontSize: 18, fontWeight: 700,
+            color: 'var(--db-text)', fontFamily: 'var(--db-font-mono)',
+            letterSpacing: '-0.02em',
+          }}>
+            {liveBalance.toFixed(2)}
+            <span style={{ fontSize: 10, color: 'var(--db-text-dim)', marginLeft: 4 }}>ANT</span>
           </div>
-          <div
-            style={{
-              fontSize: 10,
-              color: liveDelta >= 0 ? 'var(--db-teal)' : 'var(--db-red)',
-              marginTop: 2,
-              fontFamily: 'var(--db-font-mono)',
-            }}
-          >
-            {liveDelta >= 0 ? '▲' : '▼'} {Math.abs(liveDelta).toFixed(2)} now
+          <div style={{
+            fontSize: 10, fontFamily: 'var(--db-font-mono)',
+            color: liveDelta >= 0 ? 'var(--db-teal)' : 'var(--db-red)',
+            marginTop: 2,
+          }}>
+            {liveDelta >= 0 ? '+' : ''}{liveDelta.toFixed(2)} live
           </div>
         </div>
       )}
+
     </aside>
   );
 }
 
 function LiveDot() {
   return (
-    <span
-      style={{
-        position: 'relative',
-        display: 'inline-block',
-        width: 7,
-        height: 7,
-        flexShrink: 0,
-      }}
-    >
-      <span
-        style={{
-          display: 'block',
-          width: 7,
-          height: 7,
-          borderRadius: '50%',
-          background: 'var(--db-teal)',
-        }}
-      />
-      <span
-        style={{
-          position: 'absolute',
-          inset: -3,
-          borderRadius: '50%',
-          background: 'var(--db-teal)',
-          opacity: 0.3,
-          animation: 'db-pulse 2s ease infinite',
-        }}
-      />
-    </span>
+    <span style={{
+      display: 'inline-block', width: 5, height: 5,
+      borderRadius: '50%', background: 'var(--db-teal)',
+      boxShadow: '0 0 4px var(--db-teal)',
+    }} />
   );
 }
