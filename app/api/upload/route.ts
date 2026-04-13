@@ -1,22 +1,25 @@
 // app/api/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { put } from '@vercel/blob'
-import { kv } from '@vercel/kv'
+import { Redis } from '@upstash/redis'
 
 export const runtime = 'nodejs'
 
+const kv = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+})
+
 const HEADERS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 // ── Auth check ────────────────────────────────────────────────────────────────
 function isAuthorized(req: NextRequest): boolean {
-  // Check header token (for API clients)
   const headerToken = req.headers.get('x-upload-token')
   if (headerToken && headerToken === process.env.UPLOAD_SECRET) return true
 
-  // Check cookie token (for dashboard browser uploads)
   const cookieToken = req.cookies.get('upload_token')?.value
   if (cookieToken && cookieToken === process.env.UPLOAD_SECRET) return true
 
@@ -29,7 +32,7 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
 
-  // ── Auth gate ───────────────────────────────────────────────────────────────
+  // ── Auth gate ──────────────────────────────────────────────────────────────
   if (!isAuthorized(req)) {
     return NextResponse.json(
       { error: 'Unauthorized — upload token required' },
@@ -48,7 +51,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 1. Upload to Blob ───────────────────────────────────────────────────────
+  // ── 1. Upload to Blob ──────────────────────────────────────────────────────
   let blob
   try {
     blob = await put(`assets/${category}/${file.name}`, file, {
@@ -63,25 +66,31 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 2. Build metadata ───────────────────────────────────────────────────────
+  // ── 2. Build metadata ──────────────────────────────────────────────────────
   const asset = {
-    id:          crypto.randomUUID(),
-    filename:    file.name,
+    id:           crypto.randomUUID(),
+    filename:     file.name,
     category,
-    status:      'draft',
-    blobUrl:     blob.url,
+    status:       'draft',
+    blobUrl:      blob.url,
     thumbnailUrl: blob.url,
-    priceUsd:    null,
-    antcoin:     null,
-    meta:        `${(file.size / (1024 * 1024)).toFixed(1)} MB · ${file.type}`,
-    exif:        '',
-    uploadedAt:  new Date().toISOString(),
+    priceUsd:     null,
+    antcoin:      null,
+    meta:         `${(file.size / (1024 * 1024)).toFixed(1)} MB · ${file.type}`,
+    exif:         '',
+    uploadedAt:   new Date().toISOString(),
   }
 
-  // ── 3. Write to KV ──────────────────────────────────────────────────────────
+  // ── 3. Write to KV (with dedup by filename+category) ──────────────────────
   try {
-    const existing: object[] = (await kv.get('assets')) ?? []
-    await kv.set('assets', [asset, ...existing])
+    const existing: any[] = (await kv.get('assets')) ?? []
+
+    // Remove any prior entry with same filename+category (re-upload = replace)
+    const filtered = existing.filter(
+      (a) => !(a.filename === file.name && a.category === category)
+    )
+
+    await kv.set('assets', [asset, ...filtered])
   } catch (err) {
     console.error('KV write failed:', err)
     return NextResponse.json(
@@ -90,7 +99,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 4. Ping Discord ─────────────────────────────────────────────────────────
+  // ── 4. Ping Discord ────────────────────────────────────────────────────────
   try {
     const baseUrl = req.nextUrl.origin
     await fetch(`${baseUrl}/api/notify`, {
@@ -98,7 +107,12 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'upload_complete',
-        meta: { filename: file.name, category, size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`, url: blob.url },
+        meta: {
+          filename: file.name,
+          category,
+          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          url: blob.url,
+        },
       }),
     })
   } catch (err) {
