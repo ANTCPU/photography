@@ -1,7 +1,7 @@
 // app/login/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PLACEHOLDERS } from '@/lib/constants'
 
@@ -23,7 +23,21 @@ const USERS = [
   },
 ]
 
+// ── Suspense wrapper — required by Next.js 14 for useSearchParams ─────────────
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: '#0b0d11', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", color: '#4a4f63' }}>···</span>
+      </div>
+    }>
+      <LoginInner />
+    </Suspense>
+  )
+}
+
+// ── Inner component — reads searchParams safely inside Suspense ───────────────
+function LoginInner() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const from         = searchParams.get('from') ?? '/dashboard'
@@ -55,7 +69,7 @@ export default function LoginPage() {
         credentials: 'include',
       })
       if (res.ok) {
-        router.push(from) // ← go back to where they came from
+        router.push(from)
       } else {
         setStatus('error')
         setPassword('')
@@ -114,9 +128,9 @@ export default function LoginPage() {
                 ) : (
                   <div style={{
                     ...s.avatarInitials,
-                    border:     selected ? '2px solid #c8f564'          : '2px solid rgba(255,255,255,0.1)',
-                    background: selected ? 'rgba(200,245,100,0.15)'     : 'rgba(255,255,255,0.05)',
-                    color:      selected ? '#c8f564'                    : '#7c8096',
+                    border:     selected ? '2px solid #c8f564'      : '2px solid rgba(255,255,255,0.1)',
+                    background: selected ? 'rgba(200,245,100,0.15)' : 'rgba(255,255,255,0.05)',
+                    color:      selected ? '#c8f564'                : '#7c8096',
                   }}>
                     {u.initials}
                   </div>
