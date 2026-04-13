@@ -1,4 +1,7 @@
+// app/dashboard/layout.tsx
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import '../../styles/dashboard.css';
 import { DashboardProvider } from './context/DashboardContext';
 import Sidebar from './components/SideBar';
@@ -9,24 +12,25 @@ export const metadata: Metadata = {
   description: 'Internal control center for Amanda Photography',
 };
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('upload_token')?.value;
+
+  if (!token || token !== process.env.UPLOAD_SECRET) {
+    redirect('/login');
+  }
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        minHeight: '100vh',
-        background: 'var(--db-bg)',
-      }}
-    >
-      <DashboardProvider>
-        <Sidebar />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <TopBar />
-          <main style={{ flex: 1, padding: '20px 24px', overflowX: 'hidden' }}>
+    <DashboardProvider>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <TopBar />
+        <div style={{ display: 'flex', flex: 1 }}>
+          <Sidebar />
+          <main style={{ flex: 1, overflow: 'auto' }}>
             {children}
           </main>
         </div>
-      </DashboardProvider>
-    </div>
+      </div>
+    </DashboardProvider>
   );
 }
