@@ -21,7 +21,7 @@ function makeSVG(w: number, h: number, label: string): string {
     `<rect width="${w}" height="${h}" fill="none" stroke="rgba(200,245,100,0.15)" stroke-width="2"/>`,
     `<text x="${cx}" y="${cy - sub}" font-family="monospace" font-size="${fs}" font-weight="700" fill="#c8f564" text-anchor="middle" dominant-baseline="middle">A</text>`,
     `<text x="${cx}" y="${cy + fs * 0.8}" font-family="monospace" font-size="${sub}" fill="#4a4f63" text-anchor="middle">${label}</text>`,
-    `<text x="${cx}" y="${cy + fs * 1.5}" font-family="monospace" font-size="${Math.round(sub * 0.85)}" fill="#2a2f3d" text-anchor="middle">${w} × ${h}</text>`,
+    `<text x="${cx}" y="${cy + fs * 1.5}" font-family="monospace" font-size="${Math.round(sub * 0.85)}" fill="#2a2f3d" text-anchor="middle">${w} x ${h}</text>`,
     `</svg>`,
   ].join('\n')
 }
