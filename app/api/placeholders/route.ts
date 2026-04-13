@@ -1,7 +1,7 @@
 // app/api/placeholders/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 const CONFIGS = {
   profile:   { w: 400,  h: 400,  label: 'Amanda Photography' },
