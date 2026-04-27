@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useDashboard } from '../context/DashboardContext'
 
 type Stats = {
   discordConnected: boolean
@@ -14,6 +15,7 @@ export default function TopBar() {
   const [stats, setStats]   = useState<Stats | null>(null)
   const [user, setUser]     = useState<string | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
+  const { sidebarCollapsed, setSidebarCollapsed } = useDashboard()
 
   useEffect(() => {
     // Get stats
@@ -57,6 +59,15 @@ export default function TopBar() {
     <header style={s.bar}>
       {/* Left — wordmark */}
       <div style={s.left}>
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          style={s.hamburger}
+          aria-label="Toggle menu"
+        >
+          <span style={{ display:'block', width:18, height:2, background:'var(--db-text)', marginBottom:4, transition:'all 0.2s' }} />
+          <span style={{ display:'block', width:18, height:2, background:'var(--db-text)', marginBottom:4, transition:'all 0.2s' }} />
+          <span style={{ display:'block', width:18, height:2, background:'var(--db-text)', transition:'all 0.2s' }} />
+        </button>
         <span style={s.wordmark}>
           AMANDA<span style={{ color: 'var(--db-accent)' }}>/</span>STUDIO
         </span>
@@ -118,6 +129,11 @@ const s: Record<string, React.CSSProperties> = {
     background: 'var(--db-teal)',
     boxShadow: '0 0 4px var(--db-teal)',
     flexShrink: 0,
+  },
+  hamburger: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    padding: '4px', display: 'flex', flexDirection: 'column',
+    justifyContent: 'center', flexShrink: 0,
   },
   logoutBtn: {
     fontSize: 11, fontFamily: 'var(--db-font-mono)',

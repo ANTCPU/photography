@@ -34,6 +34,7 @@ export default function Sidebar() {
   } = useDashboard();
 
   // Live-tick the Antcoin balance for the sidebar widget
+  const [isMobile, setIsMobile] = useState(false)
   const [liveBalance, setLiveBalance] = useState(metrics?.antcoin.balance ?? 0);
   const [liveDelta,   setLiveDelta]   = useState(0);
 
@@ -47,6 +48,19 @@ export default function Sidebar() {
     }, 3000);
     return () => clearInterval(id);
   }, []);
+
+  // Auto-collapse on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarCollapsed(true);
+      else setSidebarCollapsed(false);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [setSidebarCollapsed]);
 
   const sectionLabels: Record<string, string> = {
     core:    'Core',
@@ -63,14 +77,30 @@ export default function Sidebar() {
   const w = sidebarCollapsed ? 56 : 200;
 
   return (
+    <>
+    {/* Mobile overlay backdrop */}
+    {isMobile && !sidebarCollapsed && (
+      <div
+        onClick={() => setSidebarCollapsed(true)}
+        style={{
+          position: 'fixed', inset: 0, top: 52,
+          background: 'rgba(0,0,0,0.6)', zIndex: 19,
+        }}
+      />
+    )}
     <aside style={{
-      width: w, minWidth: w, maxWidth: w,
+      width: isMobile ? (sidebarCollapsed ? 0 : '100vw') : w,
+      minWidth: isMobile ? (sidebarCollapsed ? 0 : '100vw') : w,
+      maxWidth: isMobile ? (sidebarCollapsed ? 0 : '100vw') : w,
       background: 'var(--db-surface)',
       borderRight: '1px solid var(--db-border)',
       display: 'flex', flexDirection: 'column',
-      height: '100vh', position: 'sticky', top: 0,
-      transition: 'width 0.2s, min-width 0.2s',
-      overflow: 'hidden', zIndex: 10,
+      height: '100vh',
+      position: isMobile ? 'fixed' : 'sticky',
+      top: isMobile ? 52 : 0,
+      left: 0,
+      transition: 'width 0.25s, min-width 0.25s',
+      overflow: 'hidden', zIndex: 20,
     }}>
 
       {/* ── Profile ── */}
@@ -243,6 +273,8 @@ export default function Sidebar() {
       )}
 
     </aside>
+    </aside>
+    </>
   );
 }
 
