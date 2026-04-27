@@ -273,7 +273,6 @@ export default function Sidebar() {
       )}
 
     </aside>
-    </aside>
     </>
   );
 }
