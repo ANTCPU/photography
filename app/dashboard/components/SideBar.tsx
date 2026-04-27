@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import { PLACEHOLDERS } from '@/lib/constants';
@@ -35,6 +37,14 @@ export default function Sidebar() {
 
   // Live-tick the Antcoin balance for the sidebar widget
   const [isMobile, setIsMobile] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const router = useRouter()
+
+  async function handleLogout() {
+    setLoggingOut(true)
+    await fetch('/api/auth', { method: 'DELETE', credentials: 'include' })
+    router.push('/login')
+  }
   const [liveBalance, setLiveBalance] = useState(metrics?.antcoin.balance ?? 0);
   const [liveDelta,   setLiveDelta]   = useState(0);
 
@@ -272,6 +282,25 @@ export default function Sidebar() {
         </div>
       )}
 
+      {/* ── Sign Out ── */}
+      {!sidebarCollapsed && (
+        <div style={{ borderTop: '1px solid var(--db-border)', padding: '12px 14px' }}>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            style={{
+              width: '100%', background: 'none',
+              border: '1px solid var(--db-border)',
+              borderRadius: 6, padding: '8px 10px',
+              color: 'var(--db-red)', cursor: 'pointer',
+              fontSize: 11, fontFamily: 'var(--db-font-mono)',
+              textAlign: 'left', transition: 'border-color 0.15s',
+            }}
+          >
+            {loggingOut ? '···' : '← sign out'}
+          </button>
+        </div>
+      )}
     </aside>
     </>
   );
