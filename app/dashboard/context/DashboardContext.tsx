@@ -144,6 +144,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const clearDone = useCallback(() => {
+    setUploads((prev) => prev.filter((u) => u.status !== 'done'));
+  }, []);
+
   return (
     <DashboardContext.Provider
       value={{
@@ -158,6 +162,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setHasUnsavedChanges,
         addUpload,
         updateUpload,
+        clearDone,
       }}
     >
       {children}

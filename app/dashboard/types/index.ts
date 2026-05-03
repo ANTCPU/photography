@@ -44,6 +44,7 @@ export interface UploadItem {
   filename: string;
   status: 'done' | 'uploading' | 'queued' | 'error';
   progress: number; // 0–100
+  errorMsg?: string; // populated on error status
 }
 
 export interface DashboardMetrics {
@@ -67,4 +68,5 @@ export interface DashboardContextValue {
   setHasUnsavedChanges: (v: boolean) => void;
   addUpload: (item: UploadItem) => void;
   updateUpload: (id: string, patch: Partial<UploadItem>) => void;
+  clearDone: () => void;
 }
