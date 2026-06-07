@@ -33,3 +33,4 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+.env*.local

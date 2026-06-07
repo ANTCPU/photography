@@ -8,8 +8,11 @@ export const PLATFORM = {
   publicSite: 'https://antcpu.com/manda',
 } as const
 
+export const CLOUDINARY = {
+  folder: 'amandaland',
+} as const
+
 export const PLACEHOLDERS = {
-  // Real images — uploaded through Amanda platform itself ✅
   profile:   'https://w9cysoaxfshj0nmr.public.blob.vercel-storage.com/assets/Portrait/profile.png',
   banner:    'https://w9cysoaxfshj0nmr.public.blob.vercel-storage.com/assets/Lifestyle/banner.png',
   thumbnail: 'https://w9cysoaxfshj0nmr.public.blob.vercel-storage.com/assets/Portrait/profile.png',
