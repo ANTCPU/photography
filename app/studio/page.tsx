@@ -136,10 +136,47 @@ export default function StudioPage() {
                 <div style={s.specItem}><span style={s.specLabel}>Height</span><span style={s.specValue}>{format.h}px</span></div>
                 <div style={s.specItem}><span style={s.specLabel}>Ratio</span><span style={s.specValue}>{(format.w / format.h).toFixed(2)}:1</span></div>
               </div>
-              <button style={s.resizeBtn} disabled={!imageUrl}>
-                {imageUrl ? `✦ Resize for ${platform.label}` : 'Drop an image first'}
-              </button>
-              {!imageUrl && <p style={s.comingSoon}>↑ Drop a source image to enable resize</p>}
+              <button
+  disabled={!imageUrl || !format}
+  onClick={async () => {
+    if (!imageUrl || !format) return
+    const btn = document.activeElement as HTMLButtonElement
+    btn.textContent = 'resizing...'
+    btn.disabled = true
+    try {
+      const blob = await fetch(imageUrl).then(r => r.blob())
+      const fd   = new FormData()
+      fd.append('file',     new File([blob], 'source.jpg', { type: blob.type }))
+      fd.append('platform', selectedPlatform)
+      fd.append('format',   format.name.toLowerCase().replace(/\s+/g, ''))
+      fd.append('w',        String(format.w))
+      fd.append('h',        String(format.h))
+      fd.append('output',   'webp')
+      const res = await fetch('/api/resize', {
+        method: 'POST',
+        headers: { 'x-upload-token': process.env.NEXT_PUBLIC_UPLOAD_TOKEN ?? '' },
+        body: fd,
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const resizedBlob = await res.blob()
+      const url  = URL.createObjectURL(resizedBlob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `amanda_${selectedPlatform}_${format.name.toLowerCase().replace(/\s+/g,'_')}_${format.w}x${format.h}.webp`
+      a.click()
+      URL.revokeObjectURL(url)
+      btn.textContent = `✦ Resize for ${platform.label}`
+    } catch (e) {
+      console.error(e)
+      btn.textContent = '✕ Failed — try again'
+    } finally {
+      btn.disabled = !imageUrl || !format
+    }
+  }}
+  style={s.resizeBtn}
+>
+  {imageUrl && format ? `✦ Resize for ${platform.label}` : 'Drop an image first'}
+</button>
             </div>
           )}
         </div>
