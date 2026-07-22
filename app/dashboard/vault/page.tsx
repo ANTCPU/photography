@@ -206,7 +206,7 @@ function VaultRow({ asset, acting, partners, onRelease, onAssign, onRemove, onRe
   onRevoke?: () => void
 }) {
   const [showAssign, setShowAssign] = useState(false)
-  const vis = asset.visibility || 'public'
+  const vis = (asset.visibility || 'public') as 'private' | 'partner' | 'public'
 
   const visBadge = {
     private: { color: '#ff5e5e', bg: 'rgba(255,94,94,0.08)',   border: 'rgba(255,94,94,0.2)',   label: '🔒 private' },
