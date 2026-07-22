@@ -50,7 +50,7 @@ export async function OPTIONS() {
 // ── PATCH — update asset visibility / partner / status ────────────────────────
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!isAuthorized(req)) {
     return NextResponse.json(
@@ -59,7 +59,7 @@ export async function PATCH(
     )
   }
 
-  const { id } = params
+  const { id } = await params
   if (!id) {
     return NextResponse.json(
       { error: 'Missing asset id' },
@@ -109,14 +109,11 @@ export async function PATCH(
   const existing = assets[idx]
   const now      = new Date().toISOString()
 
-  // Build the update — only apply fields that were provided
   const updated = {
     ...existing,
     ...(visibility !== undefined && {
       visibility,
-      // Set releasedAt when going public for the first time
       releasedAt: visibility === 'public' && !existing.releasedAt ? now : existing.releasedAt,
-      // Clear releasedAt if pulled back to private
       ...(visibility === 'private' && { releasedAt: null }),
     }),
     ...(partner  !== undefined && { partner:  partner  || null }),
@@ -144,11 +141,9 @@ export async function PATCH(
 }
 
 // ── DELETE — remove asset from KV ─────────────────────────────────────────────
-// Note: does NOT delete from Vercel Blob or Cloudinary
-// Blob deletion requires the Vercel Blob SDK del() — add if needed
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!isAuthorized(req)) {
     return NextResponse.json(
@@ -157,7 +152,7 @@ export async function DELETE(
     )
   }
 
-  const { id } = params
+  const { id } = await params
   if (!id) {
     return NextResponse.json(
       { error: 'Missing asset id' },
