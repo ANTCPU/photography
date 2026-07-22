@@ -92,15 +92,7 @@ export default function Sidebar() {
     {/* Mobile overlay backdrop */}
     {isMobile && !sidebarCollapsed && (
       <div
-        onClick={() => {
-  if (item.id === 'vault') {
-    router.push('/dashboard/vault')
-  } else {
-    setActiveSection(item.id)
-    if (isMobile) setSidebarCollapsed(true)
-  }
-}}
-
+        onClick={() => setSidebarCollapsed(true)}
         style={{
           position: 'fixed', inset: 0, top: 52,
           background: 'rgba(0,0,0,0.6)', zIndex: 19,
@@ -213,7 +205,14 @@ export default function Sidebar() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => {
+  if (item.id === 'vault') {
+    router.push('/dashboard/vault')
+  } else {
+    setActiveSection(item.id)
+    if (isMobile) setSidebarCollapsed(true)
+  }
+}}
                   title={sidebarCollapsed ? item.label : undefined}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center',
