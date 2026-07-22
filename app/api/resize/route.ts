@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
   const baseName = file.name.replace(/\.[^/.]+$/, '')
   const filename = `${baseName}_${w}x${h}.${ext}`
 
-  return new NextResponse(resized, {
+    return new NextResponse(new Uint8Array(resized), {
     status: 200,
     headers: {
       ...HEADERS,
