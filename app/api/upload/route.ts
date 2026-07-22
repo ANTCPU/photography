@@ -1,4 +1,17 @@
 // app/api/upload/route.ts
+// ─────────────────────────────────────────────────────────────────────────────
+// Amanda Photography — Upload API
+// Dual storage: Vercel Blob (source) + Cloudinary (delivery)
+// Auth: upload_token cookie (studio login) or x-upload-token header
+//
+// Asset visibility model:
+//   private  — staging only, dashboard auth required to view
+//   partner  — visible to named partner via x-partner-key header
+//   public   — visible to everyone via /api/assets
+//
+// Default on upload: private
+// Release: PATCH /api/assets/[id] sets visibility → public
+// ─────────────────────────────────────────────────────────────────────────────
 import { NextRequest, NextResponse } from 'next/server'
 import { put } from '@vercel/blob'
 import { Redis } from '@upstash/redis'
@@ -38,9 +51,13 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const formData = await req.formData()
-  const file     = formData.get('file') as File | null
-  const category = (formData.get('category') as string) || 'Uncategorized'
+  const formData   = await req.formData()
+  const file       = formData.get('file')       as File   | null
+  const category   = (formData.get('category')  as string) || 'Uncategorized'
+  // visibility: private | partner | public — default private
+  const visibility = (formData.get('visibility') as string) || 'private'
+  // partner: optional — 'mapofpi' | 'wedding' | null
+  const partner    = (formData.get('partner')   as string) || null
 
   if (!file) {
     return NextResponse.json(
@@ -49,12 +66,21 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 1. Vercel Blob — source of truth ───────────────────────────────────────
+  // Validate visibility value
+  const VALID_VISIBILITY = ['private', 'partner', 'public']
+  if (!VALID_VISIBILITY.includes(visibility)) {
+    return NextResponse.json(
+      { error: `Invalid visibility. Valid: ${VALID_VISIBILITY.join(', ')}` },
+      { status: 400, headers: HEADERS }
+    )
+  }
+
+  // ── 1. Vercel Blob — source of truth ────────────────────────────────────────
   let blob
   try {
     blob = await put(`assets/${category}/${file.name}`, file, {
-      access:          'public',
-      addRandomSuffix: false,
+      access:            'public',
+      addRandomSuffix:   false,
     })
   } catch (err) {
     console.error('Blob upload failed:', err)
@@ -64,7 +90,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 2. Cloudinary — delivery layer ─────────────────────────────────────────
+  // ── 2. Cloudinary — delivery layer ──────────────────────────────────────────
   let cloudinaryId = ''
   try {
     const arrayBuffer = await file.arrayBuffer()
@@ -89,11 +115,15 @@ export async function POST(req: NextRequest) {
     console.error('Cloudinary upload failed (non-fatal):', err)
   }
 
-  // ── 3. Build metadata ──────────────────────────────────────────────────────
+  // ── 3. Build metadata ────────────────────────────────────────────────────────
   const asset = {
     id:           crypto.randomUUID(),
     filename:     file.name,
     category,
+    // Visibility — private by default, released manually
+    visibility,
+    partner:      partner || null,
+    releasedAt:   visibility === 'public' ? new Date().toISOString() : null,
     status:       'draft',
     blobUrl:      blob.url,
     cloudinaryId,
@@ -105,7 +135,7 @@ export async function POST(req: NextRequest) {
     uploadedAt:   new Date().toISOString(),
   }
 
-  // ── 4. Write to KV ─────────────────────────────────────────────────────────
+  // ── 4. Write to KV ───────────────────────────────────────────────────────────
   try {
     const existing: any[] = (await kv.get('assets')) ?? []
     const filtered = existing.filter(
@@ -120,7 +150,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 5. Ping Discord ────────────────────────────────────────────────────────
+  // ── 5. Ping Discord ──────────────────────────────────────────────────────────
   try {
     const baseUrl = req.nextUrl.origin
     await fetch(`${baseUrl}/api/notify`, {
@@ -129,10 +159,12 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         type: 'upload_complete',
         meta: {
-          filename:     file.name,
+          filename:    file.name,
           category,
-          size:         `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          url:          blob.url,
+          visibility,
+          partner:     partner || 'none',
+          size:        `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          url:         blob.url,
           cloudinaryId: cloudinaryId || 'not uploaded',
         },
       }),
@@ -149,6 +181,8 @@ export async function POST(req: NextRequest) {
       cloudinaryId,
       thumbnailUrl: asset.thumbnailUrl,
       filename:     file.name,
+      visibility,
+      partner:      partner || null,
     },
     { status: 200, headers: HEADERS }
   )
