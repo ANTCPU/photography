@@ -137,46 +137,57 @@ export default function StudioPage() {
                 <div style={s.specItem}><span style={s.specLabel}>Ratio</span><span style={s.specValue}>{(format.w / format.h).toFixed(2)}:1</span></div>
               </div>
               <button
-  disabled={!imageUrl || !format}
-  onClick={async () => {
-    if (!imageUrl || !format) return
-    const btn = document.activeElement as HTMLButtonElement
+  disabled={!imageUrl || !selectedFormat}
+  style={{
+    ...s.resizeBtn,
+    opacity: imageUrl && selectedFormat ? 1 : 0.4,
+    cursor:  imageUrl && selectedFormat ? 'pointer' : 'not-allowed',
+  }}
+  onClick={async (e) => {
+    if (!imageUrl || !selectedFormat || !format) return
+    const btn = e.currentTarget
+    const original = btn.textContent
     btn.textContent = 'resizing...'
     btn.disabled = true
     try {
-      const blob = await fetch(imageUrl).then(r => r.blob())
-      const fd   = new FormData()
-      fd.append('file',     new File([blob], 'source.jpg', { type: blob.type }))
-      fd.append('platform', selectedPlatform)
-      fd.append('format',   format.name.toLowerCase().replace(/\s+/g, ''))
-      fd.append('w',        String(format.w))
-      fd.append('h',        String(format.h))
-      fd.append('output',   'webp')
+      const sourceBlob = await fetch(imageUrl).then(r => r.blob())
+      const fd = new FormData()
+      fd.append('file',   new File([sourceBlob], 'source.jpg', { type: sourceBlob.type }))
+      fd.append('w',      String(format.w))
+      fd.append('h',      String(format.h))
+      fd.append('output', 'webp')
+      fd.append('fit',    'cover')
       const res = await fetch('/api/resize', {
-        method: 'POST',
-        headers: { 'x-upload-token': process.env.NEXT_PUBLIC_UPLOAD_TOKEN ?? '' },
-        body: fd,
+        method:      'POST',
+        credentials: 'include',
+        body:        fd,
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(err.error ?? 'Resize failed')
+      }
       const resizedBlob = await res.blob()
       const url  = URL.createObjectURL(resizedBlob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `amanda_${selectedPlatform}_${format.name.toLowerCase().replace(/\s+/g,'_')}_${format.w}x${format.h}.webp`
+      a.download = `amanda_${selectedPlatform}_${selectedFormat.toLowerCase().replace(/[\s/]+/g,'_')}_${format.w}x${format.h}.webp`
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      btn.textContent = `✦ Resize for ${platform.label}`
-    } catch (e) {
-      console.error(e)
-      btn.textContent = '✕ Failed — try again'
-    } finally {
-      btn.disabled = !imageUrl || !format
+      btn.textContent = `✓ Downloaded ${format.w}×${format.h}`
+      setTimeout(() => { btn.textContent = original!; btn.disabled = false }, 2500)
+    } catch (err: any) {
+      btn.textContent = `✕ ${err.message ?? 'Failed — try again'}`
+      setTimeout(() => { btn.textContent = original!; btn.disabled = false }, 2500)
     }
   }}
-  style={s.resizeBtn}
 >
-  {imageUrl && format ? `✦ Resize for ${platform.label}` : 'Drop an image first'}
+  {imageUrl && format
+    ? `✦ Resize for ${platform.label} — ${format.w}×${format.h}`
+    : 'Drop an image first'}
 </button>
+
             </div>
           )}
         </div>
@@ -215,15 +226,6 @@ export default function StudioPage() {
             ))}
           </div>
 
-        </div>
-      </div>
-
-      {/* Coming Soon Banner */}
-      <div style={s.comingBanner}>
-        <span style={s.comingIcon}>⚙️</span>
-        <div>
-          <div style={s.comingTitle}>Resize engine coming next</div>
-          <div style={s.comingSub}>Sharp-powered API route — <code style={s.code}>POST /api/resize</code> — will process and return the resized image at the selected dimensions.</div>
         </div>
       </div>
 
