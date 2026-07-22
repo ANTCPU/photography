@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'portfolio',  label: 'Portfolio',  icon: '◻', section: 'core' },
   { id: 'uploads',    label: 'Uploads',    icon: '↑', section: 'core', badge: 3 },
   { id: 'analytics',  label: 'Analytics',  icon: '∿', section: 'core' },
+  { id: 'vault',      label: 'Vault',      icon: '🔒', section: 'core' },
   { id: 'wallet',     label: 'Wallet',     icon: '◈', section: 'antcoin' },
   { id: 'sales',      label: 'Sales',      icon: '◇', section: 'antcoin' },
   { id: 'licensing',  label: 'Licensing',  icon: '≋', section: 'antcoin' },
@@ -91,7 +92,15 @@ export default function Sidebar() {
     {/* Mobile overlay backdrop */}
     {isMobile && !sidebarCollapsed && (
       <div
-        onClick={() => setSidebarCollapsed(true)}
+        onClick={() => {
+  if (item.id === 'vault') {
+    router.push('/dashboard/vault')
+  } else {
+    setActiveSection(item.id)
+    if (isMobile) setSidebarCollapsed(true)
+  }
+}}
+
         style={{
           position: 'fixed', inset: 0, top: 52,
           background: 'rgba(0,0,0,0.6)', zIndex: 19,
