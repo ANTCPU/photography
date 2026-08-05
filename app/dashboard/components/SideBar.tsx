@@ -184,7 +184,7 @@ export default function Sidebar() {
           )}
           {/* Single toggle button — expand or collapse */}
           <button
-            onClick={() => setSidebarCollapsed(v => !v)}
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             style={{
               marginLeft: sidebarCollapsed ? undefined : 'auto',
               background: 'none',
