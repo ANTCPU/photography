@@ -1,231 +1,559 @@
 // app/page.tsx
-"use client"
+// Amanda.Studio — Splash Dash
+// Minimal control surface. Live data. Fast access to everything.
+// No marketing copy. No hero image. Just buttons and status.
 
-import { useEffect, useState } from "react"
-import { PLACEHOLDERS } from "@/lib/constants"
+'use client'
 
-type PlatformStatus = {
+import { useEffect, useState } from 'react'
+import { PLATFORM, SEASON, API } from '@/lib/constants'
+
+type Stats = {
   discordConnected: boolean
-  totalEvents: number
+  totalEvents:      number
+  topCategory:      string
+  lastEvent?:       { meta?: { filename?: string; category?: string }; timestamp?: string }
 }
 
-export default function AmandaPlatformHome() {
-  const [status,     setStatus]     = useState<PlatformStatus | null>(null)
-  const [assetCount, setAssetCount] = useState<number | null>(null)
+export default function SplashDash() {
+  const [stats,       setStats]       = useState<Stats | null>(null)
+  const [assetCount,  setAssetCount]  = useState<number | null>(null)
+  const [time,        setTime]        = useState('')
+  const [loading,     setLoading]     = useState(true)
 
+  // Live clock
   useEffect(() => {
-    fetch("/api/stats")
-      .then(r => r.json())
-      .then(d => setStatus(d.status))
-      .catch(() => setStatus({ discordConnected: false, totalEvents: 0 }))
+    const tick = () => setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
   }, [])
 
+  // Fetch stats + asset count in parallel
   useEffect(() => {
-    fetch("/api/assets")
-      .then(r => r.json())
-      .then(d => setAssetCount(Array.isArray(d.assets) ? d.assets.length : null))
-      .catch(() => setAssetCount(null))
+    Promise.all([
+      fetch(API.stats).then(r => r.json()),
+      fetch(API.search + '?q=').then(r => r.json()),
+    ])
+      .then(([s, a]) => {
+        setStats(s.status)
+        setAssetCount(a.count ?? null)
+      })
+      .catch(() => setStats({ discordConnected: false, totalEvents: 0, topCategory: '—' }))
+      .finally(() => setLoading(false))
   }, [])
 
-  const discordLive = status?.discordConnected ?? false
-  const events      = status?.totalEvents ?? 0
+  const discord    = stats?.discordConnected ?? false
+  const events     = stats?.totalEvents      ?? 0
+  const topCat     = stats?.topCategory      ?? '—'
+  const lastFile   = stats?.lastEvent?.meta?.filename ?? '—'
+  const lastCat    = stats?.lastEvent?.meta?.category ?? ''
+  const lastTime   = stats?.lastEvent?.timestamp
+    ? new Date(stats.lastEvent.timestamp).toLocaleDateString()
+    : '—'
 
   return (
     <div style={s.root}>
 
-      {/* ── Topbar ── */}
-      <div style={s.topbar}>
-        <div style={s.topbarInner}>
-          <span style={s.wordmark}>AMANDA<span style={s.accent}>.</span>STUDIO</span>
-          <nav style={s.topNav}>
-            <a href="/dashboard/vault" style={s.topNavLink}>Vault</a>
-            <a href="/studio"          style={s.topNavLink}>Resize</a>
-            <a href="/wiki"            style={s.topNavLink}>Docs</a>
-            <a href="/dashboard"       style={s.topNavLogin}>→ Studio</a>
-          </nav>
-        </div>
-      </div>
-
-      {/* ── Hero fold — above the fold CTA ── */}
-      <div style={s.heroFold}>
-        {/* Background image with overlay */}
-        <div style={s.heroFoldBg}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={PLACEHOLDERS.banner} alt="" style={s.heroFoldImg} />
-          <div style={s.heroFoldOverlay} />
-        </div>
-
-        {/* Content */}
-        <div style={s.heroFoldContent}>
-          <div style={s.heroFoldInner}>
-
-            {/* Badge */}
-            <div style={s.badge}>PHOTOGRAPHY PLATFORM · PI NETWORK PARTNER</div>
-
-            {/* Headline */}
-            <h1 style={s.heroTitle}>
-              Amanda<br />
-              <span style={s.accent}>Photography</span>
-            </h1>
-
-            {/* Sub */}
-            <p style={s.heroSub}>
-              Professional image studio for the Pi Network ecosystem.
-              Private vault, partner brand assets, social pack delivery
-              and a full serverless backend.
-            </p>
-
-            {/* CTAs */}
-            <div style={s.heroActions}>
-              <a href="/dashboard" style={s.btnPrimary}>→ Enter Studio</a>
-              <a href="https://antcpu.com/manda" style={s.btnSecondary}>View Portfolio</a>
-              <a href="/dashboard/vault" style={s.btnVault}>🔒 Vault</a>
+      {/* ── Header strip ── */}
+      <header style={s.header}>
+        <div style={s.headerInner}>
+          <div style={s.wordmark}>
+            AMANDA<span style={s.dot}>.</span>STUDIO
+          </div>
+          <div style={s.headerRight}>
+            <div style={s.clock}>{time}</div>
+            <div style={s.nodePill}>
+              <span style={s.nodeDot} />
+              NODE 1 · ONLINE
             </div>
-
-            {/* Three pillars */}
-            <div style={s.pillars}>
-              {[
-                { icon: '📸', title: 'Photography Studio',  desc: 'Upload · manage · deliver' },
-                { icon: '🤝', title: 'Partner Brands',      desc: 'Map of Pi · Wedding · private vault' },
-                { icon: '⚡', title: 'API & Social Pack',   desc: 'Resize · Cloudinary · mega copy' },
-              ].map(p => (
-                <div key={p.title} style={s.pillar}>
-                  <span style={s.pillarIcon}>{p.icon}</span>
-                  <div>
-                    <div style={s.pillarTitle}>{p.title}</div>
-                    <div style={s.pillarDesc}>{p.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* ── Status Bar ── */}
-      <div style={s.statusBar}>
-        <div style={s.statusInner}>
-          <div style={s.statuDot(discordLive)} />
-          <span style={s.statusText}>{discordLive ? 'Discord Live' : 'Discord Offline'}</span>
-          <span style={s.statusSep}>·</span>
-          <span style={s.statusText}>{events} Events</span>
-          {assetCount !== null && (
-            <>
-              <span style={s.statusSep}>·</span>
-              <span style={s.statusText}>{assetCount} Public Assets</span>
-            </>
-          )}
-          <span style={s.statusSep}>·</span>
-          <a href="https://antcpu.com/manda" style={s.statusLink}>antcpu.com/manda ↗</a>
-        </div>
-      </div>
+      {/* ── Main grid ── */}
+      <main style={s.main}>
 
-      {/* ── Nav Cards ── */}
-      <div style={s.section}>
-        <div style={s.navGrid}>
-          <NavCard href="/dashboard"       icon="⬆" title="Studio Dashboard"  desc="Upload images, manage assets, search your portfolio, and monitor upload status." accent />
-          <NavCard href="/dashboard/vault" icon="🔒" title="Private Vault"     desc="Stage images privately for partner brands. Assign to Map of Pi, Wedding, or release public." accent />
-          <NavCard href="/ai"              icon="🤖" title="AI Tools"          desc="Resize, enhance, rerender and describe — every image gets smarter from the moment it's uploaded." />
-          <NavCard href="/studio"          icon="⚡" title="Resize Engine"     desc="Resize any image to exact social media dimensions across all major platforms." />
-          <NavCard href="/api/assets"      icon="◈" title="Assets API"        desc="Public JSON endpoint — filtered by visibility, partner key, and category." />
-          <NavCard href="/wiki"            icon="◈" title="Docs & Wiki"        desc="Architecture overview, API reference, roadmap, and platform status." />
+        {/* ── Live stat row ── */}
+        <div style={s.statRow}>
+          <Stat label="Assets"      value={loading ? '···' : String(assetCount ?? 0)} color="#c8f564" />
+          <Stat label="Events"      value={loading ? '···' : String(events)}           color="#c8f564" />
+          <Stat label="Discord"     value={loading ? '···' : discord ? '✓ Live' : 'Offline'} color={discord ? '#34d6a8' : '#ff5e5e'} />
+          <Stat label="Top Cat"     value={loading ? '···' : topCat}                   color="#7c8096" />
+          <Stat label="Last Upload" value={loading ? '···' : lastFile.replace(/\.[^/.]+$/, '')} color="#7c8096" sub={lastCat || undefined} />
+          <Stat label="Date"        value={loading ? '···' : lastTime}                 color="#7c8096" />
         </div>
-      </div>
+
+        {/* ── Season band ── */}
+        <div style={s.seasonBand}>
+          <span style={s.seasonIcon}>🍂</span>
+          <span style={s.seasonText}>{SEASON.label} · {SEASON.cta}</span>
+          <a href="https://antcpu.com/manda/agent/" style={s.seasonBtn} target="_blank" rel="noreferrer">
+            Book Now →
+          </a>
+        </div>
+
+        {/* ── Button grid ── */}
+        <div style={s.grid}>
+
+          {/* Row 1 — Primary actions */}
+          <DashBtn
+            href="/dashboard"
+            icon="⬆"
+            label="Studio"
+            sub="Upload · manage · search"
+            accent
+            size="large"
+          />
+          <DashBtn
+            href="/dashboard/vault"
+            icon="🔒"
+            label="Vault"
+            sub="Private · partner · release"
+            accent
+            size="large"
+          />
+          <DashBtn
+            href="https://antcpu.com/manda/agent/"
+            icon="💬"
+            label="Agent"
+            sub="Client booking · chat"
+            highlight
+            size="large"
+            external
+          />
+
+          {/* Row 2 — Tools */}
+          <DashBtn
+            href="/studio"
+            icon="⚡"
+            label="Resize"
+            sub="Social media dimensions"
+            size="medium"
+          />
+          <DashBtn
+            href="https://antcpu.com/manda/"
+            icon="📸"
+            label="Portfolio"
+            sub="Public client-facing site"
+            size="medium"
+            external
+          />
+          <DashBtn
+            href="/dashboard/assets"
+            icon="◻"
+            label="Assets"
+            sub="Browse all uploaded files"
+            size="medium"
+          />
+
+          {/* Row 3 — Data + Docs */}
+          <DashBtn
+            href="/api/assets"
+            icon="◈"
+            label="API"
+            sub="/api/assets · JSON"
+            size="small"
+            mono
+          />
+          <DashBtn
+            href="/api/search?q="
+            icon="≋"
+            label="Search"
+            sub="/api/search · all assets"
+            size="small"
+            mono
+          />
+          <DashBtn
+            href="/api/stats"
+            icon="∿"
+            label="Stats"
+            sub="/api/stats · live"
+            size="small"
+            mono
+          />
+          <DashBtn
+            href="/wiki"
+            icon="◎"
+            label="Wiki"
+            sub="Docs · architecture · API ref"
+            size="small"
+          />
+          <DashBtn
+            href="/wiki/status"
+            icon="●"
+            label="Status"
+            sub="All systems · live checks"
+            size="small"
+          />
+          <DashBtn
+            href="/wiki/roadmap"
+            icon="⚡"
+            label="Roadmap"
+            sub="v0.1 → v0.5 milestones"
+            size="small"
+          />
+
+        </div>
+
+        {/* ── Platform constants strip ── */}
+        <div style={s.constStrip}>
+          <ConstItem label="Base URL"     value={PLATFORM.baseUrl}   href={PLATFORM.baseUrl} />
+          <ConstItem label="Public Site"  value={PLATFORM.publicSite} href={PLATFORM.publicSite} />
+          <ConstItem label="Agent"        value="antcpu.com/manda/agent/" href="https://antcpu.com/manda/agent/" />
+          <ConstItem label="Blob Storage" value="w9cysoaxfshj0nmr.public.blob.vercel-storage.com" />
+          <ConstItem label="Cloudinary"   value="res.cloudinary.com/dz0zxxd7d · amandaland/" />
+        </div>
+
+      </main>
 
       {/* ── Footer ── */}
       <footer style={s.footer}>
-        <div style={s.footerInner}>
-          <span style={s.footerMark}>AMANDA<span style={{ color: '#c8f564' }}>.</span>STUDIO</span>
-          <a href="https://antcpu.com" style={s.footerLink}>antcpu.com ↗</a>
-          <span style={s.footerCopy}>© 2026 Amanda Photography · Pi Network Partner</span>
-        </div>
+        <span style={s.footerText}>AMANDA<span style={s.dot}>.</span>STUDIO · antcpu platform · © 2026</span>
+        <a href="https://antcpu.com" style={s.footerLink}>antcpu.com ↗</a>
       </footer>
 
     </div>
   )
 }
 
-// ── NavCard ───────────────────────────────────────────────────────────────────
-function NavCard({ href, icon, title, desc, accent }: {
-  href: string; icon: string; title: string; desc: string; accent?: boolean
+// ── Stat pill ─────────────────────────────────────────────────────────────────
+function Stat({ label, value, color, sub }: {
+  label: string
+  value: string
+  color: string
+  sub?:  string
 }) {
   return (
-    <a href={href} style={s.navCard}
+    <div style={s.statCard}>
+      <div style={s.statLabel}>{label}</div>
+      <div style={{ ...s.statValue, color }}>{value}</div>
+      {sub && <div style={s.statSub}>{sub}</div>}
+    </div>
+  )
+}
+
+// ── Dashboard button ──────────────────────────────────────────────────────────
+function DashBtn({ href, icon, label, sub, accent, highlight, size, mono, external }: {
+  href:      string
+  icon:      string
+  label:     string
+  sub:       string
+  accent?:   boolean
+  highlight?: boolean
+  size:      'large' | 'medium' | 'small'
+  mono?:     boolean
+  external?: boolean
+}) {
+  const base: React.CSSProperties = {
+    display:        'flex',
+    flexDirection:  'column',
+    gap:            6,
+    padding:        size === 'large' ? '22px 24px' : size === 'medium' ? '18px 20px' : '14px 16px',
+    background:     accent    ? 'rgba(200,245,100,0.05)'
+                  : highlight ? 'rgba(232,98,26,0.06)'
+                  : '#0f1117',
+    border:         accent    ? '1px solid rgba(200,245,100,0.2)'
+                  : highlight ? '1px solid rgba(232,98,26,0.25)'
+                  : '1px solid rgba(255,255,255,0.06)',
+    borderRadius:   10,
+    textDecoration: 'none',
+    cursor:         'pointer',
+    transition:     'background 0.15s, border-color 0.15s, transform 0.1s',
+    gridColumn:     size === 'large' ? 'span 1' : 'span 1',
+  }
+
+  return (
+    <a
+      href={href}
+      style={base}
+      target={external ? '_blank' : undefined}
+      rel={external ? 'noreferrer' : undefined}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = accent ? 'rgba(200,245,100,0.35)' : 'rgba(255,255,255,0.12)'
-        e.currentTarget.style.background  = '#191d27'
+        const el = e.currentTarget
+        el.style.background    = accent    ? 'rgba(200,245,100,0.1)'
+                               : highlight ? 'rgba(232,98,26,0.12)'
+                               : '#161a24'
+        el.style.borderColor   = accent    ? 'rgba(200,245,100,0.4)'
+                               : highlight ? 'rgba(232,98,26,0.5)'
+                               : 'rgba(255,255,255,0.14)'
+        el.style.transform     = 'translateY(-1px)'
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
-        e.currentTarget.style.background  = '#12151c'
+        const el = e.currentTarget
+        el.style.background    = accent    ? 'rgba(200,245,100,0.05)'
+                               : highlight ? 'rgba(232,98,26,0.06)'
+                               : '#0f1117'
+        el.style.borderColor   = accent    ? 'rgba(200,245,100,0.2)'
+                               : highlight ? 'rgba(232,98,26,0.25)'
+                               : 'rgba(255,255,255,0.06)'
+        el.style.transform     = 'translateY(0)'
+      }}
+    >
+      <span style={{
+        fontSize:   size === 'large' ? 22 : size === 'medium' ? 18 : 14,
+        lineHeight: 1,
       }}>
-      <span style={s.navIcon}>{icon}</span>
-      <span style={s.navTitle}>{title}</span>
-      <span style={s.navDesc}>{desc}</span>
-      <span style={s.navArrow}>→</span>
+        {icon}
+      </span>
+      <span style={{
+        fontSize:   size === 'large' ? 14 : size === 'medium' ? 13 : 12,
+        fontWeight: 700,
+        color:      accent    ? '#c8f564'
+                  : highlight ? '#e8621a'
+                  : '#e8eaf0',
+        fontFamily: mono ? "'IBM Plex Mono', monospace" : "'DM Sans', sans-serif",
+        letterSpacing: mono ? '0.04em' : 'normal',
+      }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize:   10,
+        color:      '#4a4f63',
+        fontFamily: "'IBM Plex Mono', monospace",
+        lineHeight: 1.4,
+      }}>
+        {sub}
+      </span>
     </a>
   )
 }
 
+// ── Constant item ─────────────────────────────────────────────────────────────
+function ConstItem({ label, value, href }: {
+  label: string
+  value: string
+  href?: string
+}) {
+  const inner = (
+    <>
+      <span style={s.constLabel}>{label}</span>
+      <span style={s.constValue}>{value}</span>
+    </>
+  )
+  return href ? (
+    <a href={href} style={s.constItem} target="_blank" rel="noreferrer">
+      {inner}
+    </a>
+  ) : (
+    <div style={s.constItem}>{inner}</div>
+  )
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
-const s: Record<string, any> = {
-  root: { minHeight: '100vh', background: '#0b0d11', color: '#e8eaf0', fontFamily: "'DM Sans', sans-serif", fontSize: 13 },
+const s: Record<string, React.CSSProperties> = {
+  root: {
+    minHeight:   '100vh',
+    background:  '#080a0f',
+    color:       '#e8eaf0',
+    fontFamily:  "'DM Sans', sans-serif",
+    fontSize:    13,
+    display:     'flex',
+    flexDirection: 'column',
+  },
 
-  // Topbar
-  topbar:      { borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(11,13,17,0.95)', position: 'sticky', top: 0, zIndex: 100, backdropFilter: 'blur(12px)' },
-  topbarInner: { maxWidth: 1100, margin: '0 auto', padding: '0 20px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  wordmark:    { fontSize: 12, fontWeight: 700, letterSpacing: '0.18em', color: '#e8eaf0', fontFamily: "'IBM Plex Mono', monospace" },
-  accent:      { color: '#c8f564' },
-  topNav:      { display: 'flex', gap: 20, alignItems: 'center' },
-  topNavLink:  { color: '#7c8096', textDecoration: 'none', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" },
-  topNavLogin: { color: '#c8f564', textDecoration: 'none', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", border: '1px solid rgba(200,245,100,0.25)', borderRadius: 6, padding: '4px 10px' },
+  // Header
+  header: {
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    background:   'rgba(8,10,15,0.98)',
+    position:     'sticky',
+    top:          0,
+    zIndex:       100,
+    backdropFilter: 'blur(12px)',
+  },
+  headerInner: {
+    maxWidth:       1200,
+    margin:         '0 auto',
+    padding:        '0 24px',
+    height:         52,
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+  },
+  wordmark: {
+    fontSize:      12,
+    fontWeight:    700,
+    letterSpacing: '0.2em',
+    color:         '#e8eaf0',
+    fontFamily:    "'IBM Plex Mono', monospace",
+  },
+  dot: { color: '#c8f564' },
+  headerRight: {
+    display:    'flex',
+    alignItems: 'center',
+    gap:        20,
+  },
+  clock: {
+    fontSize:   11,
+    fontFamily: "'IBM Plex Mono', monospace",
+    color:      '#4a4f63',
+    letterSpacing: '0.06em',
+  },
+  nodePill: {
+    display:       'flex',
+    alignItems:    'center',
+    gap:           6,
+    fontSize:      9,
+    fontFamily:    "'IBM Plex Mono', monospace",
+    fontWeight:    700,
+    letterSpacing: '0.14em',
+    color:         '#34d6a8',
+    background:    'rgba(52,214,168,0.08)',
+    border:        '1px solid rgba(52,214,168,0.2)',
+    borderRadius:  20,
+    padding:       '4px 10px',
+  },
+  nodeDot: {
+    display:      'inline-block',
+    width:        5,
+    height:       5,
+    borderRadius: '50%',
+    background:   '#34d6a8',
+    boxShadow:    '0 0 6px #34d6a8',
+    animation:    'pulse 2s infinite',
+  },
 
-  // Hero fold
-  heroFold:        { position: 'relative', width: '100%', minHeight: 'clamp(520px, 70vh, 760px)', display: 'flex', alignItems: 'center' },
-  heroFoldBg:      { position: 'absolute', inset: 0, overflow: 'hidden' },
-  heroFoldImg:     { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-  heroFoldOverlay: { position: 'absolute', inset: 0, background: 'linear-gradient(105deg, rgba(11,13,17,0.96) 45%, rgba(11,13,17,0.5) 100%)' },
-  heroFoldContent: { position: 'relative', zIndex: 1, width: '100%' },
-  heroFoldInner:   { maxWidth: 1100, margin: '0 auto', padding: '60px 40px' },
+  // Main
+  main: {
+    flex:      1,
+    maxWidth:  1200,
+    width:     '100%',
+    margin:    '0 auto',
+    padding:   '28px 24px',
+    display:   'flex',
+    flexDirection: 'column',
+    gap:       20,
+  },
 
-  // Hero text
-  badge:      { display: 'inline-block', fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.15em', color: '#c8f564', background: 'rgba(200,245,100,0.08)', border: '1px solid rgba(200,245,100,0.2)', borderRadius: 20, padding: '4px 12px', marginBottom: 24 },
-  heroTitle:  { fontSize: 'clamp(44px, 7vw, 72px)', fontWeight: 700, lineHeight: 1.0, letterSpacing: '-0.02em', color: '#e8eaf0', marginBottom: 20, marginTop: 0 },
-  heroSub:    { fontSize: 'clamp(13px, 2vw, 15px)', color: '#7c8096', maxWidth: 460, marginBottom: 36, lineHeight: 1.75 },
-  heroActions:{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 48 },
-  btnPrimary: { display: 'inline-block', background: '#c8f564', color: '#0b0d11', fontWeight: 700, fontSize: 13, padding: '12px 28px', borderRadius: 8, textDecoration: 'none' },
-  btnSecondary:{ display: 'inline-block', background: 'transparent', color: '#e8eaf0', fontWeight: 500, fontSize: 13, padding: '12px 28px', borderRadius: 8, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)' },
-  btnVault:   { display: 'inline-block', background: 'rgba(255,94,94,0.08)', color: '#ff5e5e', fontWeight: 600, fontSize: 13, padding: '12px 28px', borderRadius: 8, textDecoration: 'none', border: '1px solid rgba(255,94,94,0.2)' },
+  // Stat row
+  statRow: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+    gap:                 10,
+  },
+  statCard: {
+    background:   '#0f1117',
+    border:       '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 8,
+    padding:      '12px 14px',
+    display:      'flex',
+    flexDirection:'column',
+    gap:          4,
+  },
+  statLabel: {
+    fontSize:      9,
+    fontFamily:    "'IBM Plex Mono', monospace",
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase' as const,
+    color:         '#4a4f63',
+  },
+  statValue: {
+    fontSize:      18,
+    fontWeight:    700,
+    fontFamily:    "'IBM Plex Mono', monospace",
+    letterSpacing: '-0.02em',
+    lineHeight:    1,
+  },
+  statSub: {
+    fontSize:   9,
+    fontFamily: "'IBM Plex Mono', monospace",
+    color:      '#4a4f63',
+    marginTop:  2,
+  },
 
-  // Three pillars
-  pillars:     { display: 'flex', gap: 32, flexWrap: 'wrap' },
-  pillar:      { display: 'flex', alignItems: 'flex-start', gap: 12 },
-  pillarIcon:  { fontSize: 20, lineHeight: 1, marginTop: 2 },
-  pillarTitle: { fontSize: 12, fontWeight: 700, color: '#e8eaf0', marginBottom: 3 },
-  pillarDesc:  { fontSize: 11, color: '#4a4f63', fontFamily: "'IBM Plex Mono', monospace" },
+  // Season band
+  seasonBand: {
+    display:      'flex',
+    alignItems:   'center',
+    gap:          12,
+    background:   'rgba(240,165,0,0.06)',
+    border:       '1px solid rgba(240,165,0,0.15)',
+    borderRadius: 8,
+    padding:      '10px 16px',
+    flexWrap:     'wrap' as const,
+  },
+  seasonIcon: { fontSize: 14 },
+  seasonText: {
+    fontSize:   11,
+    fontFamily: "'IBM Plex Mono', monospace",
+    color:      '#f0a500',
+    flex:       1,
+  },
+  seasonBtn: {
+    fontSize:      10,
+    fontWeight:    700,
+    fontFamily:    "'IBM Plex Mono', monospace",
+    color:         '#f0a500',
+    border:        '1px solid rgba(240,165,0,0.3)',
+    borderRadius:  4,
+    padding:       '4px 12px',
+    textDecoration:'none',
+    background:    'rgba(240,165,0,0.08)',
+    whiteSpace:    'nowrap' as const,
+  },
 
-  // Status bar
-  statusBar:   { borderBottom: '1px solid rgba(255,255,255,0.06)', background: '#12151c', padding: '0 20px' },
-  statusInner: { maxWidth: 1100, margin: '0 auto', height: 40, display: 'flex', alignItems: 'center', gap: 10 },
-  statuDot:    (live: boolean) => ({ width: 6, height: 6, borderRadius: '50%', background: live ? '#34d6a8' : '#ff5e5e', flexShrink: 0 }),
-  statusText:  { fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", color: '#7c8096' },
-  statusSep:   { fontSize: 11, color: '#4a4f63' },
-  statusLink:  { fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", color: '#4a4f63', textDecoration: 'none' },
+  // Button grid
+  grid: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap:                 10,
+  },
 
-  // Nav cards
-  section:  { maxWidth: 1100, margin: '0 auto', padding: '32px 20px' },
-  navGrid:  { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 },
-  navCard:  { background: '#12151c', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '20px 20px 16px', textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: 5, transition: 'border-color 0.15s, background 0.15s', cursor: 'pointer' },
-  navIcon:  { fontSize: 18, marginBottom: 4 },
-  navTitle: { fontSize: 13, fontWeight: 600, color: '#e8eaf0' },
-  navDesc:  { fontSize: 11, color: '#7c8096', lineHeight: 1.6, flex: 1 },
-  navArrow: { fontSize: 13, marginTop: 8, fontFamily: "'IBM Plex Mono', monospace", color: '#4a4f63' },
+  // Constants strip
+  constStrip: {
+    display:      'flex',
+    gap:          8,
+    flexWrap:     'wrap' as const,
+    background:   '#0a0c10',
+    border:       '1px solid rgba(255,255,255,0.04)',
+    borderRadius: 8,
+    padding:      '12px 16px',
+  },
+  constItem: {
+    display:        'flex',
+    flexDirection:  'column' as const,
+    gap:            2,
+    padding:        '6px 12px',
+    background:     '#0f1117',
+    border:         '1px solid rgba(255,255,255,0.05)',
+    borderRadius:   6,
+    textDecoration: 'none',
+    cursor:         'default',
+  },
+  constLabel: {
+    fontSize:      8,
+    fontFamily:    "'IBM Plex Mono', monospace",
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase' as const,
+    color:         '#4a4f63',
+  },
+  constValue: {
+    fontSize:   10,
+    fontFamily: "'IBM Plex Mono', monospace",
+    color:      '#7c8096',
+    wordBreak:  'break-all' as const,
+  },
 
   // Footer
-  footer:      { borderTop: '1px solid rgba(255,255,255,0.06)', padding: '24px 20px', marginTop: 40 },
-  footerInner: { maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 },
-  footerMark:  { fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, letterSpacing: '0.15em', color: '#4a4f63' },
-  footerLink:  { fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", color: '#c8f564', textDecoration: 'none' },
-  footerCopy:  { fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: '#4a4f63' },
+  footer: {
+    borderTop:      '1px solid rgba(255,255,255,0.04)',
+    padding:        '16px 24px',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    flexWrap:       'wrap' as const,
+    gap:            10,
+  },
+  footerText: {
+    fontSize:      10,
+    fontFamily:    "'IBM Plex Mono', monospace",
+    color:         '#2a2f3d',
+    letterSpacing: '0.08em',
+  },
+  footerLink: {
+    fontSize:      10,
+    fontFamily:    "'IBM Plex Mono', monospace",
+    color:         '#c8f564',
+    textDecoration:'none',
+  },
 }
