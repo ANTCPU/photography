@@ -1,12 +1,14 @@
 // app/api/placeholders/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'nodejs'
+export const runtime = 'edge'
 
-const CONFIGS = {
+const CONFIGS: Record<string, { w: number; h: number; label: string }> = {
   profile:   { w: 400,  h: 400,  label: 'Amanda Photography' },
   banner:    { w: 1500, h: 500,  label: 'Amanda Photography' },
-  thumbnail: { w: 400,  h: 400,  label: 'Amanda Photography' },
+  thumbnail: { w: 300,  h: 200,  label: 'Amanda Photography' },
+  card:      { w: 170,  h: 170,  label: 'Amanda Photography' },
+  og:        { w: 1200, h: 630,  label: 'Amanda Photography' },
 }
 
 function makeSVG(w: number, h: number, label: string): string {
@@ -27,9 +29,15 @@ function makeSVG(w: number, h: number, label: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  const type   = req.nextUrl.searchParams.get('type') ?? 'profile'
-  const config = CONFIGS[type as keyof typeof CONFIGS] ?? CONFIGS.profile
-  const svg    = makeSVG(config.w, config.h, config.label)
+  const params = req.nextUrl.searchParams
+  const type   = params.get('type') ?? 'profile'
+  const base   = CONFIGS[type] ?? CONFIGS.profile
+
+  // Optional dimension override — clamped to safe limits
+  const w = Math.min(Math.max(parseInt(params.get('w') ?? '0') || base.w, 16), 2400)
+  const h = Math.min(Math.max(parseInt(params.get('h') ?? '0') || base.h, 16), 2400)
+
+  const svg = makeSVG(w, h, base.label)
 
   return new NextResponse(svg, {
     status: 200,
