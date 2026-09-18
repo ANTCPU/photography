@@ -3,14 +3,17 @@
 // Amanda Photography — Notify API
 // HTTP layer only — all visual logic lives in lib/discord/
 // Validates event → builds embed → fires Discord → writes KV
+//
+// ⚠️  Single webhook — DISCORD_WEBHOOK_URL routes all events to one channel.
+//     When multi-channel routing is needed, wire through ADS notifyDiscord()
+//     the same way photography-lead does.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server'
-import { Redis } from '@upstash/redis'
-import { buildEmbed } from '@/lib/discord'
+import { Redis }                     from '@upstash/redis'
+import { buildEmbed }                from '@/lib/discord'
 import type { EventType, SiteEvent } from '@/lib/discord'
 
-// ── KV client ─────────────────────────────────────────────────────────────────
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL!,
   token: process.env.KV_REST_API_TOKEN!,
@@ -18,7 +21,6 @@ const kv = new Redis({
 
 export const runtime = 'edge'
 
-// ── CORS — allow agent (antcpu.com) and studio (amandaland.vercel.app) ────────
 const HEADERS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -48,12 +50,11 @@ export async function POST(req: NextRequest) {
     const webhookUrl = process.env.DISCORD_WEBHOOK_URL
     if (!webhookUrl) {
       return NextResponse.json(
-        { error: 'DISCORD_WEBHOOK_URL not configured' },
+        { error: 'Webhook not configured' },  // 🔒 no var name exposed
         { status: 500, headers: HEADERS }
       )
     }
 
-    // ── Build event ───────────────────────────────────────────────────────────
     const event: SiteEvent = {
       id:        crypto.randomUUID(),
       type,
@@ -62,20 +63,16 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
     }
 
-    // ── Build visual embed — all logic in lib/discord/embeds.ts ──────────────
     const embed = buildEmbed(event)
 
-    // ── Fire Discord + write KV in parallel ───────────────────────────────────
     await Promise.all([
 
-      // Discord webhook
       fetch(webhookUrl, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ embeds: [embed] }),
       }),
 
-      // KV writes
       (async () => {
         const existing: SiteEvent[] = (await kv.get('events')) ?? []
         await kv.set('events', [event, ...existing].slice(0, 50))
@@ -95,7 +92,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[notify] error:', err)
     return NextResponse.json(
-      { error: 'Internal error', detail: String(err) },
+      { error: 'Internal error' },  // 🔒 detail removed — was leaking err string
       { status: 500, headers: HEADERS }
     )
   }
