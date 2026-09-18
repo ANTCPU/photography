@@ -1,14 +1,26 @@
 'use client'
 
-import { useCallback, useId, useState } from 'react'
+import { useCallback, useId, useState, useEffect } from 'react'
 import { useDashboard } from '../context/DashboardContext'
 import type { UploadItem } from '../types'
-import { CATEGORY_LABELS, DEFAULT_CATEGORY } from '@/lib/categories'
 
-const ACCEPTED_EXTS = '.CR2,.NEF,.ARW,.DNG,.JPG,.JPEG,.PNG,.TIFF,.RAF,.WEBP'
-const ACCEPTED_DISPLAY = ['CR2', 'NEF', 'ARW', 'DNG', 'JPG', 'PNG', 'TIFF', 'WEBP']
-const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'image/tiff', 'image/webp']
-const ACCEPTED_EXT_LIST = ['cr2','nef','arw','dng','jpg','jpeg','png','tiff','raf','webp']
+// ── Categories API ────────────────────────────────────────────────────────────
+const CATEGORIES_API = 'https://antcpu-ads.vercel.app/api/categories'
+
+type Category = {
+  slug:       string
+  label:      string
+  icon:       string
+  group_name: string
+  sort_order: number
+}
+
+type Grouped = Record<string, Category[]>
+
+// ── File validation ───────────────────────────────────────────────────────────
+const ACCEPTED_EXTS    = '.CR2,.NEF,.ARW,.DNG,.JPG,.JPEG,.PNG,.TIFF,.RAF,.WEBP,.HEIC,.HEIF'
+const ACCEPTED_DISPLAY = ['CR2','NEF','ARW','DNG','JPG','PNG','TIFF','WEBP','HEIC','HEIF']
+const ACCEPTED_EXT_LIST = ['cr2','nef','arw','dng','jpg','jpeg','png','tiff','raf','webp','heic','heif']
 const MAX_FILE_MB = 50
 
 const STATUS_COLORS: Record<string, string> = {
@@ -37,19 +49,51 @@ function validateFile(file: File): string | null {
   return null
 }
 
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function UploadZone() {
   const { uploads, addUpload, updateUpload, clearDone } = useDashboard()
   const inputId = useId()
-  const [category, setCategory]         = useState(DEFAULT_CATEGORY)
-  const [dragOver, setDragOver]         = useState(false)
-  const [lastUploaded, setLastUploaded] = useState<string | null>(null)
-  const [authError, setAuthError]       = useState(false)
 
+  // ── Category state ──
+  const [grouped,       setGrouped]       = useState<Grouped>({})
+  const [catLoading,    setCatLoading]    = useState(true)
+  const [category,      setCategory]      = useState('Portrait')
+  const [customMode,    setCustomMode]    = useState(false)
+  const [customValue,   setCustomValue]   = useState('')
+
+  // ── Upload state ──
+  const [dragOver,      setDragOver]      = useState(false)
+  const [lastUploaded,  setLastUploaded]  = useState<string | null>(null)
+  const [authError,     setAuthError]     = useState(false)
+
+  // ── Fetch categories on mount ──────────────────────────────────────────────
+  useEffect(() => {
+    fetch(CATEGORIES_API)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.grouped) {
+          setGrouped(data.grouped)
+          // Set default to first category in first group
+          const firstGroup = Object.values(data.grouped as Grouped)[0]
+          if (firstGroup?.[0]) setCategory(firstGroup[0].label)
+        }
+      })
+      .catch(() => {
+        // Silent fail — fallback to manual entry
+      })
+      .finally(() => setCatLoading(false))
+  }, [])
+
+  // ── Active category label (custom or selected) ─────────────────────────────
+  const activeCategory = customMode && customValue.trim()
+    ? customValue.trim()
+    : category
+
+  // ── Upload logic ───────────────────────────────────────────────────────────
   const uploadFile = useCallback(
     async (file: File, itemId: string) => {
       setAuthError(false)
 
-      // ── Client-side validation ──
       const validationError = validateFile(file)
       if (validationError) {
         updateUpload(itemId, { status: 'error', progress: 0, errorMsg: validationError })
@@ -57,10 +101,11 @@ export default function UploadZone() {
       }
 
       updateUpload(itemId, { status: 'uploading', progress: 10 })
+
       try {
         const formData = new FormData()
         formData.append('file', file)
-        formData.append('category', category)
+        formData.append('category', activeCategory)
 
         let progress = 10
         const ticker = setInterval(() => {
@@ -73,6 +118,7 @@ export default function UploadZone() {
           body: formData,
           credentials: 'include',
         })
+
         clearInterval(ticker)
 
         if (res.ok) {
@@ -87,11 +133,11 @@ export default function UploadZone() {
           if (res.status === 401) setAuthError(true)
           updateUpload(itemId, { status: 'error', progress: 0, errorMsg: msg })
         }
-      } catch (err) {
+      } catch {
         updateUpload(itemId, { status: 'error', progress: 0, errorMsg: 'network error — check connection' })
       }
     },
-    [category, updateUpload]
+    [activeCategory, updateUpload]
   )
 
   const handleFiles = useCallback(
@@ -99,9 +145,9 @@ export default function UploadZone() {
       if (!files) return
       Array.from(files).forEach((file) => {
         const item: UploadItem = {
-          id: `u-${Date.now()}-${Math.random()}`,
+          id:       `u-${Date.now()}-${Math.random()}`,
           filename: file.name,
-          status: 'queued',
+          status:   'queued',
           progress: 0,
         }
         addUpload(item)
@@ -122,9 +168,6 @@ export default function UploadZone() {
 
   const handleRetry = useCallback(
     (item: UploadItem) => {
-      // Reset state then re-trigger via hidden input workaround
-      // We can't re-access the File object from UploadItem alone,
-      // so we mark it queued and prompt user to re-drop
       updateUpload(item.id, { status: 'queued', progress: 0, errorMsg: undefined })
     },
     [updateUpload]
@@ -146,26 +189,58 @@ export default function UploadZone() {
         </div>
       )}
 
-      {/* ── Category Row ── */}
+      {/* ── Category Selector ── */}
       <div style={s.categoryRow}>
         <span style={s.categoryLabel}>Category</span>
-        <div style={s.categoryPills}>
-          {CATEGORY_LABELS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              style={{
-                ...s.pill,
-                background:  category === c ? 'rgba(200,245,100,0.12)' : 'var(--db-surface2)',
-                borderColor: category === c ? 'rgba(200,245,100,0.4)'  : 'var(--db-border)',
-                color:       category === c ? 'var(--db-accent)'        : 'var(--db-text-muted)',
-                fontWeight:  category === c ? 600 : 400,
-              }}
-            >
-              {c}
-            </button>
-          ))}
+
+        <div style={s.categoryControls}>
+          {/* Grouped dropdown */}
+          <select
+            value={customMode ? '__custom__' : category}
+            onChange={e => {
+              if (e.target.value === '__custom__') {
+                setCustomMode(true)
+                setCustomValue('')
+              } else {
+                setCustomMode(false)
+                setCategory(e.target.value)
+              }
+            }}
+            style={s.select}
+            disabled={catLoading}
+          >
+            {catLoading && (
+              <option value="">Loading…</option>
+            )}
+            {!catLoading && Object.entries(grouped).map(([group, cats]) => (
+              <optgroup key={group} label={group}>
+                {cats.map(c => (
+                  <option key={c.slug} value={c.label}>
+                    {c.icon} {c.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+            <option value="__custom__">＋ Custom…</option>
+          </select>
+
+          {/* Custom input — shown when custom selected */}
+          {customMode && (
+            <input
+              type="text"
+              placeholder="Type category name…"
+              value={customValue}
+              onChange={e => setCustomValue(e.target.value)}
+              style={s.customInput}
+              autoFocus
+            />
+          )}
         </div>
+
+        {/* Active category indicator */}
+        <span style={s.activeCat}>
+          Uploading to <strong>{activeCategory}</strong>
+        </span>
       </div>
 
       {/* ── Drop Zone ── */}
@@ -189,24 +264,20 @@ export default function UploadZone() {
           style={{ display: 'none' }}
           onChange={(e) => handleFiles(e.target.files)}
         />
-
         <div style={s.dropIcon}>{dragOver ? '⬇' : '⬆'}</div>
         <div style={s.dropTitle}>
           {dragOver ? 'Drop to upload' : 'Drop files here or click to browse'}
         </div>
         <div style={s.dropSub}>
-          Uploading to <span style={s.dropCategory}>{category}</span>
-          <span style={s.dropLimit}> · max {MAX_FILE_MB} MB</span>
+          <span style={s.dropLimit}>max {MAX_FILE_MB} MB per file</span>
         </div>
-
         <div style={s.formatRow}>
           {ACCEPTED_DISPLAY.map((ext) => (
             <span key={ext} style={s.formatPill}>{ext}</span>
           ))}
         </div>
-
         {lastUploaded && (
-          <div style={s.lastUploaded}>✓ Last uploaded: {lastUploaded}</div>
+          <div style={s.lastUploaded}>✓ Last: {lastUploaded}</div>
         )}
       </div>
 
@@ -254,7 +325,6 @@ export default function UploadZone() {
 }
 
 // ── Upload Row ────────────────────────────────────────────────────────────────
-
 function UploadRow({ item, onRetry }: { item: UploadItem; onRetry: (item: UploadItem) => void }) {
   const color = STATUS_COLORS[item.status]
   return (
@@ -289,28 +359,30 @@ function UploadRow({ item, onRetry }: { item: UploadItem; onRetry: (item: Upload
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-
 const s: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', flexDirection: 'column', gap: 12 },
-
+  root:       { display: 'flex', flexDirection: 'column', gap: 12 },
   authBanner: { display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,94,94,0.08)', border: '1px solid rgba(255,94,94,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#ff5e5e', fontFamily: 'var(--db-font-mono)' },
   authLink:   { marginLeft: 'auto', color: '#c8f564', textDecoration: 'none', fontSize: 11 },
 
-  categoryRow:   { display: 'flex', flexDirection: 'column', gap: 8 },
-  categoryLabel: { fontSize: 10, fontFamily: 'var(--db-font-mono)', letterSpacing: '0.12em', color: 'var(--db-text-dim)', textTransform: 'uppercase' },
-  categoryPills: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  pill:          { fontSize: 11, fontFamily: 'var(--db-font-mono)', border: '1px solid', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', transition: 'all 0.15s', background: 'none' },
+  // Category
+  categoryRow:      { display: 'flex', flexDirection: 'column', gap: 6 },
+  categoryLabel:    { fontSize: 10, fontFamily: 'var(--db-font-mono)', letterSpacing: '0.12em', color: 'var(--db-text-dim)', textTransform: 'uppercase' },
+  categoryControls: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  select:           { fontSize: 12, fontFamily: 'var(--db-font-mono)', background: 'var(--db-surface2)', border: '1px solid var(--db-border)', borderRadius: 6, padding: '6px 10px', color: 'var(--db-text)', cursor: 'pointer', outline: 'none', minWidth: 180 },
+  customInput:      { fontSize: 12, fontFamily: 'var(--db-font-mono)', background: 'var(--db-surface2)', border: '1px solid rgba(200,245,100,0.3)', borderRadius: 6, padding: '6px 10px', color: 'var(--db-accent)', outline: 'none', minWidth: 180 },
+  activeCat:        { fontSize: 10, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text-dim)' },
 
-  dropzone:     { border: '2px dashed', borderRadius: 12, padding: '32px 24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, minHeight: 200 },
-  dropIcon:     { fontSize: 36, lineHeight: 1, transition: 'color 0.2s' },
+  // Dropzone
+  dropzone:     { border: '2px dashed', borderRadius: 12, padding: '32px 24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, minHeight: 180 },
+  dropIcon:     { fontSize: 36, lineHeight: 1 },
   dropTitle:    { fontSize: 14, fontWeight: 600, color: 'var(--db-text)' },
   dropSub:      { fontSize: 12, color: 'var(--db-text-muted)' },
-  dropCategory: { color: 'var(--db-accent)', fontWeight: 600 },
   dropLimit:    { color: 'var(--db-text-dim)', fontSize: 11 },
   formatRow:    { display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 4 },
   formatPill:   { fontSize: 10, fontFamily: 'var(--db-font-mono)', background: 'var(--db-surface2)', border: '1px solid var(--db-border)', borderRadius: 4, padding: '2px 7px', color: 'var(--db-text-dim)' },
   lastUploaded: { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-teal)', marginTop: 4 },
 
+  // Queue
   queue:       { background: 'var(--db-surface2)', border: '1px solid var(--db-border)', borderRadius: 10, overflow: 'hidden' },
   queueHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--db-border)' },
   queueTitle:  { fontSize: 10, fontFamily: 'var(--db-font-mono)', letterSpacing: '0.12em', color: 'var(--db-text-dim)', textTransform: 'uppercase' },
@@ -320,6 +392,7 @@ const s: Record<string, React.CSSProperties> = {
   emptyText:   { fontSize: 11, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' },
   queueList:   { display: 'flex', flexDirection: 'column' },
 
+  // Upload rows
   uploadRow:    { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: '1px solid var(--db-border)', gap: 12 },
   uploadLeft:   { display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' },
   uploadDot:    { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
@@ -330,7 +403,6 @@ const s: Record<string, React.CSSProperties> = {
   progressTrack:{ width: 60, height: 3, background: 'var(--db-surface3)', borderRadius: 2, overflow: 'hidden' },
   progressBar:  { height: '100%', background: 'var(--db-blue)', borderRadius: 2, transition: 'width 0.3s' },
   uploadStatus: { fontSize: 10, fontFamily: 'var(--db-font-mono)', whiteSpace: 'nowrap' },
-
-  retryBtn: { fontSize: 10, fontFamily: 'var(--db-font-mono)', background: 'rgba(255,94,94,0.1)', border: '1px solid rgba(255,94,94,0.3)', borderRadius: 4, padding: '2px 8px', color: 'var(--db-red)', cursor: 'pointer' },
-  clearBtn:  { fontSize: 10, fontFamily: 'var(--db-font-mono)', background: 'rgba(200,245,100,0.08)', border: '1px solid rgba(200,245,100,0.2)', borderRadius: 4, padding: '2px 8px', color: 'var(--db-accent)', cursor: 'pointer' },
+  retryBtn:     { fontSize: 10, fontFamily: 'var(--db-font-mono)', background: 'rgba(255,94,94,0.1)', border: '1px solid rgba(255,94,94,0.3)', borderRadius: 4, padding: '2px 8px', color: 'var(--db-red)', cursor: 'pointer' },
+  clearBtn:     { fontSize: 10, fontFamily: 'var(--db-font-mono)', background: 'rgba(200,245,100,0.08)', border: '1px solid rgba(200,245,100,0.2)', borderRadius: 4, padding: '2px 8px', color: 'var(--db-accent)', cursor: 'pointer' },
 }
