@@ -13,12 +13,12 @@
 // Release: PATCH /api/assets/[id] sets visibility → public
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextRequest, NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
-import { Redis } from '@upstash/redis'
-import cloudinary, { thumbUrl } from '@/lib/cloudinary'
-import { CLOUDINARY } from '@/lib/constants'
+import { put }                       from '@vercel/blob'
+import { Redis }                     from '@upstash/redis'
+import cloudinary, { thumbUrl }      from '@/lib/cloudinary'
+import { CLOUDINARY }                from '@/lib/constants'
 
-export const runtime = 'nodejs'
+export const runtime = 'nodejs'  // Buffer + Cloudinary SDK — cannot be edge
 
 const kv = new Redis({
   url:   process.env.KV_REST_API_URL!,
@@ -30,6 +30,26 @@ const HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// ── Asset type ────────────────────────────────────────────────────────────────
+interface Asset {
+  id:           string
+  filename:     string
+  category:     string
+  visibility:   string
+  partner:      string | null
+  releasedAt:   string | null
+  status:       string
+  blobUrl:      string
+  cloudinaryId: string
+  thumbnailUrl: string
+  priceUsd:     null
+  antcoin:      null
+  meta:         string
+  exif:         string
+  uploadedAt:   string
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
 function isAuthorized(req: NextRequest): boolean {
   const headerToken = req.headers.get('x-upload-token')
   if (headerToken && headerToken === process.env.UPLOAD_SECRET) return true
@@ -54,10 +74,11 @@ export async function POST(req: NextRequest) {
   const formData   = await req.formData()
   const file       = formData.get('file')       as File   | null
   const category   = (formData.get('category')  as string) || 'Uncategorized'
-  // visibility: private | partner | public — default private
   const visibility = (formData.get('visibility') as string) || 'private'
-  // partner: optional — 'mapofpi' | 'wedding' | null
-  const partner    = (formData.get('partner')   as string) || null
+
+  // Guard against 'null' string sent from FormData
+  const partnerRaw = formData.get('partner') as string | null
+  const partner    = (partnerRaw && partnerRaw !== 'null') ? partnerRaw : null
 
   if (!file) {
     return NextResponse.json(
@@ -66,7 +87,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Validate visibility value
   const VALID_VISIBILITY = ['private', 'partner', 'public']
   if (!VALID_VISIBILITY.includes(visibility)) {
     return NextResponse.json(
@@ -75,29 +95,29 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── 1. Vercel Blob — source of truth ────────────────────────────────────────
+  // ── 1. Vercel Blob ────────────────────────────────────────────────────────
   let blob
   try {
     blob = await put(`assets/${category}/${file.name}`, file, {
-      access:            'public',
-      addRandomSuffix:   false,
+      access:          'public',
+      addRandomSuffix: false,
     })
   } catch (err) {
-    console.error('Blob upload failed:', err)
+    console.error('[upload] Blob failed:', err)
     return NextResponse.json(
-      { error: 'Blob upload failed', detail: String(err) },
+      { error: 'Blob upload failed' },
       { status: 500, headers: HEADERS }
     )
   }
 
-  // ── 2. Cloudinary — delivery layer ──────────────────────────────────────────
+  // ── 2. Cloudinary ─────────────────────────────────────────────────────────
   let cloudinaryId = ''
+  let cloudinaryOk = false
   try {
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer      = Buffer.from(arrayBuffer)
-    const publicId    = file.name.replace(/\.[^/.]+$/, '')
+    const buffer   = Buffer.from(await file.arrayBuffer())
+    const publicId = file.name.replace(/\.[^/.]+$/, '')
 
-    const result = await new Promise<any>((resolve, reject) => {
+    const result = await new Promise<{ public_id: string }>((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         {
           folder:        `${CLOUDINARY.folder}/${category}`,
@@ -105,24 +125,39 @@ export async function POST(req: NextRequest) {
           overwrite:     true,
           resource_type: 'auto',
         },
-        (err, res) => (err ? reject(err) : resolve(res))
+        (err, res) => (err ? reject(err) : resolve(res!))
       ).end(buffer)
     })
 
     cloudinaryId = result.public_id
-    console.log('Cloudinary upload ok:', cloudinaryId)
+    cloudinaryOk = true
+    console.log('[upload] Cloudinary ok:', cloudinaryId)
   } catch (err) {
-    console.error('Cloudinary upload failed (non-fatal):', err)
+    // Non-fatal — blob is source of truth, but alert via Discord
+    console.error('[upload] Cloudinary failed (non-fatal):', err)
+
+    // Fire-and-forget Discord alert — goes to DISCORD_WEBHOOK_URL via /api/notify
+    fetch(`${req.nextUrl.origin}/api/notify`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'cloudinary_error',
+        meta: {
+          filename: file.name,
+          category,
+          error:    String(err).slice(0, 200),
+        },
+      }),
+    }).catch(() => {})
   }
 
-  // ── 3. Build metadata ────────────────────────────────────────────────────────
-  const asset = {
+  // ── 3. Build asset ────────────────────────────────────────────────────────
+  const asset: Asset = {
     id:           crypto.randomUUID(),
     filename:     file.name,
     category,
-    // Visibility — private by default, released manually
     visibility,
-    partner:      partner || null,
+    partner,
     releasedAt:   visibility === 'public' ? new Date().toISOString() : null,
     status:       'draft',
     blobUrl:      blob.url,
@@ -135,43 +170,43 @@ export async function POST(req: NextRequest) {
     uploadedAt:   new Date().toISOString(),
   }
 
-  // ── 4. Write to KV ───────────────────────────────────────────────────────────
+  // ── 4. Write to KV ────────────────────────────────────────────────────────
   try {
-    const existing: any[] = (await kv.get('assets')) ?? []
-    const filtered = existing.filter(
-      (a) => !(a.filename === file.name && a.category === category)
+    const existing: Asset[] = (await kv.get('assets')) ?? []
+    const dupeIndex = existing.findIndex(
+      a => a.filename === file.name && a.category === category
     )
-    await kv.set('assets', [asset, ...filtered])
+    if (dupeIndex !== -1) {
+      console.log('[upload] replacing existing asset:', file.name, category)
+      existing.splice(dupeIndex, 1)
+    }
+    await kv.set('assets', [asset, ...existing])
   } catch (err) {
-    console.error('KV write failed:', err)
+    console.error('[upload] KV write failed:', err)
     return NextResponse.json(
-      { error: 'KV write failed', detail: String(err), blobUrl: blob.url },
+      { error: 'KV write failed', blobUrl: blob.url },
       { status: 500, headers: HEADERS }
     )
   }
 
-  // ── 5. Ping Discord ──────────────────────────────────────────────────────────
-  try {
-    const baseUrl = req.nextUrl.origin
-    await fetch(`${baseUrl}/api/notify`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'upload_complete',
-        meta: {
-          filename:    file.name,
-          category,
-          visibility,
-          partner:     partner || 'none',
-          size:        `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          url:         blob.url,
-          cloudinaryId: cloudinaryId || 'not uploaded',
-        },
-      }),
-    })
-  } catch (err) {
-    console.error('Discord notify failed:', err)
-  }
+  // ── 5. Discord notify ─────────────────────────────────────────────────────
+  fetch(`${req.nextUrl.origin}/api/notify`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'upload_complete',
+      meta: {
+        filename:     file.name,
+        category,
+        visibility,
+        partner:      partner || 'none',
+        size:         `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        url:          blob.url,
+        cloudinaryId: cloudinaryId || 'failed',
+        cloudinary:   cloudinaryOk ? '✅' : '❌ failed — blob fallback',
+      },
+    }),
+  }).catch(() => {})
 
   return NextResponse.json(
     {
@@ -182,7 +217,7 @@ export async function POST(req: NextRequest) {
       thumbnailUrl: asset.thumbnailUrl,
       filename:     file.name,
       visibility,
-      partner:      partner || null,
+      partner,
     },
     { status: 200, headers: HEADERS }
   )
