@@ -4,8 +4,29 @@
 import { useDashboard }                    from './context/DashboardContext'
 import UploadZone                          from './components/UploadZone'
 import SearchPanel                         from './components/SearchPanel'
-import { CATEGORIES, SEASON, API }         from '@/lib/constants'
+import { SEASON, API }                     from '@/lib/constants'
+import { CATEGORIES }                      from '@/lib/categories'
 import { useEffect, useState, useCallback } from 'react'
+
+// ── Asset type ────────────────────────────────────────────────────────────────
+interface Asset {
+  id:            string
+  filename:      string
+  category:      string
+  visibility?:   string
+  partner?:      string
+  thumbnailUrl:  string
+  blobUrl?:      string
+  cloudinaryId?: string
+  uploadedAt?:   string
+  title?:        string
+  meta?:         string
+  status?:       string
+}
+
+// ── Category lookup — case-insensitive ────────────────────────────────────────
+const findCat = (id: string) =>
+  CATEGORIES.find(c => c.id.toLowerCase() === (id ?? '').toLowerCase())
 
 // ── Micro components ──────────────────────────────────────────────────────────
 
@@ -50,7 +71,7 @@ const Empty = ({ icon, text, action }: { icon?: string; text: string; action?: R
 // ── Data hooks ────────────────────────────────────────────────────────────────
 
 function useOverviewData() {
-  const [assets,  setAssets]  = useState<any[]>([])
+  const [assets,  setAssets]  = useState<Asset[]>([])
   const [stats,   setStats]   = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -71,7 +92,7 @@ function useOverviewData() {
 }
 
 function useVaultData() {
-  const [assets,  setAssets]  = useState<any[]>([])
+  const [assets,  setAssets]  = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState<string | null>(null)
 
@@ -109,17 +130,18 @@ function Overview() {
   const discord      = stats?.discordConnected
   const events       = stats?.totalEvents ?? 0
 
-  // Build category counts from real asset data
+  // Build category counts — normalize to lowercase for lookup
   const catCounts = assets.reduce((acc: Record<string, number>, a) => {
-    if (a.category) acc[a.category] = (acc[a.category] ?? 0) + 1
+    const key = (a.category ?? '').toLowerCase()
+    acc[key] = (acc[key] ?? 0) + 1
     return acc
   }, {})
 
   const statCards = [
-    { label: 'Total Assets',  value: loading ? '···' : String(totalAssets),  color: 'var(--db-accent)' },
-    { label: 'Public',        value: loading ? '···' : String(publicAssets), color: 'var(--db-teal)'   },
-    { label: 'Discord',       value: loading ? '···' : discord ? 'Live' : 'Offline', color: discord ? 'var(--db-teal)' : 'var(--db-red)' },
-    { label: 'Events',        value: loading ? '···' : String(events),       color: 'var(--db-amber)'  },
+    { label: 'Total Assets', value: loading ? '···' : String(totalAssets),  color: 'var(--db-accent)' },
+    { label: 'Public',       value: loading ? '···' : String(publicAssets), color: 'var(--db-teal)'   },
+    { label: 'Discord',      value: loading ? '···' : discord ? 'Live' : 'Offline', color: discord ? 'var(--db-teal)' : 'var(--db-red)' },
+    { label: 'Events',       value: loading ? '···' : String(events),       color: 'var(--db-amber)'  },
   ]
 
   return (
@@ -157,7 +179,7 @@ function Overview() {
         </div>
       </Panel>
 
-      {/* Upload zone — full width, prominent */}
+      {/* Upload zone */}
       <Panel>
         <Label>⬆ Upload Images</Label>
         <UploadZone />
@@ -169,7 +191,7 @@ function Overview() {
         <SearchPanel />
       </Panel>
 
-      {/* Categories — real counts */}
+      {/* Categories — real counts from live data */}
       <Panel>
         <Label>📂 Categories</Label>
         <div style={s.catGrid}>
@@ -178,7 +200,7 @@ function Overview() {
             return (
               <div key={c.id} style={{
                 ...s.catCard,
-                borderColor: c.live && count > 0
+                borderColor: count > 0
                   ? 'rgba(200,245,100,0.15)'
                   : 'var(--db-border)',
               }}>
@@ -191,7 +213,7 @@ function Overview() {
                   fontFamily: 'var(--db-font-mono)',
                   color: count > 0 ? 'var(--db-accent)' : 'var(--db-text-dim)',
                 }}>
-                  {loading ? '···' : count > 0 ? `${count} asset${count !== 1 ? 's' : ''}` : c.live ? 'empty' : 'soon'}
+                  {loading ? '···' : count > 0 ? `${count} asset${count !== 1 ? 's' : ''}` : 'empty'}
                 </span>
               </div>
             )
@@ -203,12 +225,12 @@ function Overview() {
       <Panel>
         <div style={s.links}>
           {[
-            ['⚡ Roadmap',   '/wiki/roadmap'],
-            ['✦ Studio',    '/studio'],
-            ['◈ Wiki',      '/wiki'],
-            ['◎ Status',    '/wiki/status'],
-            ['🔒 Vault',    '/dashboard/vault'],
-            ['◻ Assets',    '/dashboard/assets'],
+            ['⚡ Roadmap',  '/wiki/roadmap'],
+            ['✦ Studio',   '/studio'],
+            ['◈ Wiki',     '/wiki'],
+            ['◎ Status',   '/wiki/status'],
+            ['🔒 Vault',   '/dashboard/vault'],
+            ['◻ Assets',   '/dashboard/assets'],
           ].map(([label, href]) => (
             <a key={href} href={href} style={s.quietLink}>{label} →</a>
           ))}
@@ -221,7 +243,7 @@ function Overview() {
 
 // ── PORTFOLIO ─────────────────────────────────────────────────────────────────
 function Portfolio() {
-  const [assets,  setAssets]  = useState<any[]>([])
+  const [assets,  setAssets]  = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -248,7 +270,7 @@ function Portfolio() {
           <Empty icon="📂" text="No assets yet" />
         ) : (
           <div style={s.assetGrid}>
-            {assets.map((a: any) => (
+            {assets.map(a => (
               <div
                 key={a.id}
                 style={s.assetCard}
@@ -266,11 +288,12 @@ function Portfolio() {
                 </div>
                 <div style={{ padding: '8px 10px' }}>
                   <div style={s.assetName}>{a.title || a.filename}</div>
-                  <div style={s.assetMeta}>{a.category} · {a.meta}</div>
+                  <div style={s.assetMeta}>
+                    {findCat(a.category)?.emoji ?? ''} {a.category} · {a.meta}
+                  </div>
                   {a.status && (
                     <div style={{
-                      marginTop: 4,
-                      fontSize: 9,
+                      marginTop: 4, fontSize: 9,
                       fontFamily: 'var(--db-font-mono)',
                       color: a.status === 'public' ? 'var(--db-teal)' : 'var(--db-text-dim)',
                       textTransform: 'uppercase' as const,
@@ -306,7 +329,7 @@ function Uploads() {
 
 // ── ANALYTICS ─────────────────────────────────────────────────────────────────
 function Analytics() {
-  const [assets,  setAssets]  = useState<any[]>([])
+  const [assets,  setAssets]  = useState<Asset[]>([])
   const [stats,   setStats]   = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -329,16 +352,16 @@ function Analytics() {
   }, {})
 
   const totalMb = assets.reduce((sum, a) => {
-    const mb = parseFloat(a.meta)
+    const mb = parseFloat(a.meta ?? '0')
     return sum + (isNaN(mb) ? 0 : mb)
   }, 0)
 
   const statCards = [
-    { label: 'Total Assets', value: String(assets.length),                              color: 'var(--db-accent)' },
-    { label: 'Storage',      value: `${totalMb.toFixed(1)} MB`,                         color: 'var(--db-blue)'   },
-    { label: 'Discord',      value: stats?.discordConnected ? 'Live' : 'Offline',       color: stats?.discordConnected ? 'var(--db-teal)' : 'var(--db-red)' },
-    { label: 'Events',       value: String(stats?.totalEvents ?? 0),                    color: 'var(--db-amber)'  },
-    { label: 'Top Category', value: stats?.topCategory ?? '—',                          color: 'var(--db-text)'   },
+    { label: 'Total Assets', value: String(assets.length),                        color: 'var(--db-accent)'  },
+    { label: 'Storage',      value: `${totalMb.toFixed(1)} MB`,                   color: 'var(--db-blue)'    },
+    { label: 'Discord',      value: stats?.discordConnected ? 'Live' : 'Offline', color: stats?.discordConnected ? 'var(--db-teal)' : 'var(--db-red)' },
+    { label: 'Events',       value: String(stats?.totalEvents ?? 0),              color: 'var(--db-amber)'   },
+    { label: 'Top Category', value: stats?.topCategory ?? '—',                    color: 'var(--db-text)'    },
     { label: 'Last Upload',  value: stats?.lastEvent?.meta?.filename?.replace(/\.[^/.]+$/, '') ?? '—', color: 'var(--db-text-dim)' },
   ]
 
@@ -369,7 +392,9 @@ function Analytics() {
                   padding: '6px 0', borderBottom: '1px solid var(--db-border)',
                   fontSize: 11, fontFamily: 'var(--db-font-mono)',
                 }}>
-                  <span style={{ color: 'var(--db-text)' }}>{cat}</span>
+                  <span style={{ color: 'var(--db-text)' }}>
+                    {findCat(cat)?.emoji ?? ''} {cat}
+                  </span>
                   <span style={{ color: 'var(--db-accent)' }}>{count}</span>
                 </div>
               ))
@@ -382,7 +407,7 @@ function Analytics() {
           ? [...Array(3)].map((_, i) => <Skel key={i} h={40} />)
           : assets.length === 0
           ? <Empty text="No assets yet" />
-          : assets.map((a: any) => (
+          : assets.map(a => (
             <div key={a.id} style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 0', borderBottom: '1px solid var(--db-border)',
@@ -410,7 +435,7 @@ function Analytics() {
                 fontSize: 10, color: 'var(--db-text-dim)',
                 fontFamily: 'var(--db-font-mono)', flexShrink: 0,
               }}>
-                {new Date(a.uploadedAt).toLocaleDateString()}
+                {a.uploadedAt ? new Date(a.uploadedAt).toLocaleDateString() : '—'}
               </span>
             </div>
           ))
@@ -431,7 +456,7 @@ function Vault() {
     setTimeout(() => setToast(null), 2500)
   }
 
-  async function patch(id: string, body: Record<string, any>) {
+  async function patch(id: string, body: Record<string, unknown>) {
     setActing(id)
     try {
       const res = await fetch(`${API.assets}/${id}`, {
@@ -575,14 +600,21 @@ function Vault() {
                   style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.filename}</div>
-                  <div style={{ fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' }}>{a.category} · {a.meta}</div>
+                  <div style={{ fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.filename}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' }}>
+                    {a.category} · {a.meta}
+                  </div>
                 </div>
                 <div style={{ fontSize: 9, color: 'var(--db-teal)', fontFamily: 'var(--db-font-mono)', background: 'rgba(0,200,150,0.08)', border: '1px solid rgba(0,200,150,0.2)', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>
                   🌐 live
                 </div>
-                <button onClick={() => patch(a.id, { visibility: 'private' })} disabled={acting === a.id}
-                  style={{ ...s.actionBtn, fontSize: 9, color: 'var(--db-text-dim)' }}>
+                <button
+                  onClick={() => patch(a.id, { visibility: 'private' })}
+                  disabled={acting === a.id}
+                  style={{ ...s.actionBtn, fontSize: 9, color: 'var(--db-text-dim)' }}
+                >
                   {acting === a.id ? '···' : 'unpublish'}
                 </button>
               </div>
@@ -596,9 +628,13 @@ function Vault() {
 
 // ── VAULT ROW ─────────────────────────────────────────────────────────────────
 function VaultRow({ asset, acting, partners, onRelease, onAssign, onRemove, onRevoke }: {
-  asset: any; acting: boolean; partners: string[]
-  onRelease: () => void; onAssign: (p: string) => void
-  onRemove: () => void; onRevoke?: () => void
+  asset:     Asset
+  acting:    boolean
+  partners:  string[]
+  onRelease: () => void
+  onAssign:  (p: string) => void
+  onRemove:  () => void
+  onRevoke?: () => void
 }) {
   const [showAssign, setShowAssign] = useState(false)
   const vis = asset.visibility || 'public'
@@ -615,7 +651,7 @@ function VaultRow({ asset, acting, partners, onRelease, onAssign, onRemove, onRe
             {asset.filename}
           </div>
           <div style={{ fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)', marginTop: 2 }}>
-            {asset.category} · {asset.meta}
+            {findCat(asset.category)?.emoji ?? ''} {asset.category} · {asset.meta}
             {asset.partner && <span style={{ color: 'var(--db-amber)', marginLeft: 6 }}>→ {asset.partner}</span>}
           </div>
         </div>
@@ -635,7 +671,7 @@ function VaultRow({ asset, acting, partners, onRelease, onAssign, onRemove, onRe
           </button>
         )}
         {vis !== 'public' && (
-                    <button onClick={() => setShowAssign(v => !v)} disabled={acting} style={s.actionBtn}>
+          <button onClick={() => setShowAssign(v => !v)} disabled={acting} style={s.actionBtn}>
             🤝 Assign partner
           </button>
         )}
@@ -704,12 +740,12 @@ export default function DashboardPage() {
       <div style={s.topnav}>
         <span style={s.topnavLabel}>JUMP TO →</span>
         {[
-          ['◻ Assets',    '/dashboard/assets'],
-          ['🔒 Vault',    '/dashboard/vault'],
-          ['⚙ API',       '/api/assets'],
-          ['◎ Status',    '/wiki/status'],
-          ['✦ Studio',    '/studio'],
-          ['⚡ Roadmap',  '/wiki/roadmap'],
+          ['◻ Assets',     '/dashboard/assets'],
+          ['🔒 Vault',     '/dashboard/vault'],
+          ['⚙ API',        '/api/assets'],
+          ['◎ Status',     '/wiki/status'],
+          ['✦ Studio',     '/studio'],
+          ['⚡ Roadmap',   '/wiki/roadmap'],
           ['🍂 Fall Open', 'https://antcpu.com/manda/'],
         ].map(([label, href]) => (
           <a
@@ -745,44 +781,30 @@ export default function DashboardPage() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
-  main:        { maxWidth: 1100, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 },
-  topnav:      { borderBottom: '1px solid var(--db-border)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'var(--db-surface)' },
-  topnavLabel: { fontSize: 10, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text-dim)', marginRight: 4 },
-  navBtn:      { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text)', textDecoration: 'none', border: '1px solid var(--db-border)', borderRadius: 6, padding: '4px 10px', transition: 'border-color 0.15s, color 0.15s', background: 'var(--db-surface2)' },
-
-  // Fall band
+  main:            { maxWidth: 1100, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 },
+  topnav:          { borderBottom: '1px solid var(--db-border)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'var(--db-surface)' },
+  topnavLabel:     { fontSize: 10, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text-dim)', marginRight: 4 },
+  navBtn:          { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text)', textDecoration: 'none', border: '1px solid var(--db-border)', borderRadius: 6, padding: '4px 10px', transition: 'border-color 0.15s, color 0.15s', background: 'var(--db-surface2)' },
   fallBand:        { display: 'flex', alignItems: 'center', gap: 14, background: 'rgba(240,165,0,0.06)', border: '1px solid rgba(240,165,0,0.18)', borderRadius: 10, padding: '14px 18px', flexWrap: 'wrap' },
   fallTitle:       { fontSize: 12, fontWeight: 700, color: '#f0a500', fontFamily: 'var(--db-font-mono)', letterSpacing: '0.06em' },
   fallSub:         { fontSize: 10, color: 'rgba(240,165,0,0.7)', fontFamily: 'var(--db-font-mono)', marginTop: 2 },
   fallBtn:         { fontSize: 10, fontWeight: 700, fontFamily: 'var(--db-font-mono)', color: '#f0a500', border: '1px solid rgba(240,165,0,0.35)', borderRadius: 5, padding: '5px 14px', textDecoration: 'none', background: 'rgba(240,165,0,0.1)', whiteSpace: 'nowrap' },
   fallBtnSecondary:{ fontSize: 10, fontFamily: 'var(--db-font-mono)', color: 'rgba(240,165,0,0.6)', border: '1px solid rgba(240,165,0,0.15)', borderRadius: 5, padding: '5px 14px', textDecoration: 'none', background: 'transparent', whiteSpace: 'nowrap' },
-
-  // Stats
-  statsGrid:   { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 },
-  statCard:    { background: 'var(--db-surface)', border: '1px solid var(--db-border)', borderRadius: 10, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8 },
-  statLabel:   { fontSize: 10, fontFamily: 'var(--db-font-mono)', letterSpacing: '0.12em', color: 'var(--db-text-dim)', textTransform: 'uppercase' },
-  statValue:   { fontSize: 22, fontWeight: 700, fontFamily: 'var(--db-font-mono)', letterSpacing: '-0.02em' },
-
-  // Categories
-  catGrid:     { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 },
-  catCard:     { background: 'var(--db-surface2)', border: '1px solid var(--db-border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, transition: 'border-color 0.15s' },
-
-  // Links
-  links:       { display: 'flex', gap: 20, flexWrap: 'wrap' },
-  quietLink:   { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-accent)', textDecoration: 'none' },
-
-  // Portfolio
-  assetGrid:   { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 12 },
-  assetCard:   { background: 'var(--db-surface2)', border: '1px solid var(--db-border)', borderRadius: 8, overflow: 'hidden', transition: 'border-color 0.15s' },
-  assetImg:    { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-  assetName:   { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  assetMeta:   { fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' },
-
-  // Vault
-  actionBtn:   { fontSize: 10, fontFamily: 'var(--db-font-mono)', background: 'var(--db-surface)', border: '1px solid var(--db-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--db-text)', transition: 'all 0.15s' },
-
-  // Empty
-  empty:       { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '36px 0' },
-  emptyText:   { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text-dim)' },
-  emptyAction: { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-accent)', textDecoration: 'none', border: '1px solid rgba(200,245,100,0.2)', borderRadius: 6, padding: '6px 14px', background: 'rgba(200,245,100,0.06)' },
+  statsGrid:       { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 },
+  statCard:        { background: 'var(--db-surface)', border: '1px solid var(--db-border)', borderRadius: 10, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8 },
+  statLabel:       { fontSize: 10, fontFamily: 'var(--db-font-mono)', letterSpacing: '0.12em', color: 'var(--db-text-dim)', textTransform: 'uppercase' },
+  statValue:       { fontSize: 22, fontWeight: 700, fontFamily: 'var(--db-font-mono)', letterSpacing: '-0.02em' },
+  catGrid:         { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 },
+  catCard:         { background: 'var(--db-surface2)', border: '1px solid var(--db-border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, transition: 'border-color 0.15s' },
+  links:           { display: 'flex', gap: 20, flexWrap: 'wrap' },
+  quietLink:       { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-accent)', textDecoration: 'none' },
+  assetGrid:       { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 12 },
+  assetCard:       { background: 'var(--db-surface2)', border: '1px solid var(--db-border)', borderRadius: 8, overflow: 'hidden', transition: 'border-color 0.15s' },
+  assetImg:        { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+  assetName:       { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  assetMeta:       { fontSize: 10, color: 'var(--db-text-dim)', fontFamily: 'var(--db-font-mono)' },
+  actionBtn:       { fontSize: 10, fontFamily: 'var(--db-font-mono)', background: 'var(--db-surface)', border: '1px solid var(--db-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--db-text)', transition: 'all 0.15s' },
+  empty:           { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '36px 0' },
+  emptyText:       { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-text-dim)' },
+  emptyAction:     { fontSize: 11, fontFamily: 'var(--db-font-mono)', color: 'var(--db-accent)', textDecoration: 'none', border: '1px solid rgba(200,245,100,0.2)', borderRadius: 6, padding: '6px 14px', background: 'rgba(200,245,100,0.06)' },
 }
