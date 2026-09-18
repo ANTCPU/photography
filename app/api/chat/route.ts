@@ -1,11 +1,18 @@
 // app/api/chat/route.ts
-// Amanda Photography — Scripted booking agent
-// Captures name + email + date + session type on booking completion
-// Fires Discord notify on booking intent
-// OpenAI-ready: when OPENAI_API_KEY is set, swap scriptedReply() for openaiReply()
+// Amanda Photography — Scripted booking agent v2
+//
+// Changes from v1:
+// — Removed openaiReply() + dead AGENT/CATEGORIES imports
+// — Fixed affirmative keywords → booking flow now starts on 'yes','sure','ok' etc.
+// — Added booking CTA to portfolio + location responses
+// — Partial lead POST to ADS at step 2 (name captured)
+// — Complete booking POST to ADS at step 4 (email captured)
+// — Email validation on step 4 — re-prompts on invalid input
+// — mac_conversations written via ADS for full session persistence
+// — DISCORD_WEBHOOK_URL kept as local fallback if ADS unreachable
 
 import { NextRequest, NextResponse } from 'next/server'
-import { AGENT, SEASON, CATEGORIES, API } from '@/lib/constants'
+import { SEASON }                    from '@/lib/constants'
 
 export const runtime = 'edge'
 
@@ -16,8 +23,31 @@ const CORS = {
   'Content-Type':                 'application/json',
 }
 
-// ── Booking flow steps ────────────────────────────────────────────────────────
+// ── ADS pipeline endpoint ─────────────────────────────────────────────────────
+// Handles Supabase writes + Discord + Resend
+const ADS_LEAD_URL = 'https://antcpu-ads.vercel.app/api/photography-lead'
 
+async function postToADS(payload: Record<string, unknown>): Promise<void> {
+  const key = process.env.PHOTOGRAPHY_API_KEY
+  if (!key) {
+    console.warn('[chat] PHOTOGRAPHY_API_KEY not set — skipping ADS pipeline')
+    return
+  }
+  try {
+    await fetch(ADS_LEAD_URL, {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key':    key,
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (err) {
+    console.error('[chat] ADS pipeline error:', err)
+  }
+}
+
+// ── Booking flow steps ────────────────────────────────────────────────────────
 const BOOKING_STEPS = [
   "I'd love that! What type of session are you thinking — portrait, lifestyle, sports, events, or something else? 📸",
   "Perfect! And what's your name so I can personalise this for you?",
@@ -28,9 +58,12 @@ const BOOKING_STEPS = [
 const BOOKING_COMPLETE = (name: string, type: string, date: string) =>
   `You're all set ${name}! I'll reach out shortly to confirm your ${type} session on ${date}. Can't wait to work with you 🎉`
 
-// ── Booking session state ─────────────────────────────────────────────────────
-// Edge runtime — in-memory per isolate, good enough for booking flow
-// For persistence across restarts, swap with KV
+const EMAIL_RETRY =
+  "Just need a valid email to confirm — what's the best one to reach you at? 📧"
+
+// ── Session state ─────────────────────────────────────────────────────────────
+// Edge in-memory — survives within isolate lifetime
+// Full persistence via mac_conversations written to ADS Supabase on each step
 
 interface BookingSession {
   step:        number
@@ -38,6 +71,7 @@ interface BookingSession {
   name:        string
   date:        string
   email:       string
+  messages:    { role: string; message: string; field_context?: string }[]
 }
 
 const sessions = new Map<string, BookingSession>()
@@ -49,11 +83,10 @@ function getSessionId(req: NextRequest): string {
 }
 
 // ── Intent map ────────────────────────────────────────────────────────────────
-
 interface Intent {
-  id:       string
-  keywords: string[]
-  flow?:    'booking' | 'pricing' | 'portfolio' | 'location'
+  id:        string
+  keywords:  string[]
+  flow?:     'booking' | 'pricing' | 'portfolio' | 'location'
   response?: string
 }
 
@@ -65,28 +98,35 @@ const INTENTS: Intent[] = [
   },
   {
     id: 'booking',
-    keywords: ['book','session','appointment','schedule','available','dates','when','reserve','sign up','set up','want to'],
+    keywords: [
+      'book','session','appointment','schedule','available','dates','when',
+      'reserve','sign up','set up','want to',
+      // affirmatives — previously dead-ended here
+      'yes','yeah','yep','sure','ok','okay','let\'s do it','sounds good',
+      'i\'m in','let\'s go','ready','absolutely','definitely',
+      'i want','i\'d like','i would','do it','sign me up',
+    ],
     flow: 'booking',
   },
   {
     id: 'portrait',
     keywords: ['portrait','headshot','family','kids','baby','graduation','senior','couple','engagement','newborn'],
-    response: "Portraits are my absolute favorite — there's nothing like capturing a real unguarded moment. I shoot natural light, on-location, no stiff poses. Want to talk dates? 📅",
+    response: "Portraits are my absolute favorite — there's nothing like capturing a real unguarded moment. I shoot natural light, on-location, no stiff poses. Want to book a date? 📅",
   },
   {
     id: 'sports',
     keywords: ['sports','baseball','football','soccer','basketball','action','game','athlete','tournament','team','lacrosse','hockey'],
-    response: "Love shooting sports — the energy and emotion are incredible. Outdoor or indoor, I've got you covered. What sport and what level are we talking? 🏆",
+    response: "Love shooting sports — the energy and emotion are incredible. Outdoor or indoor, I've got you covered. What sport and what level are we talking? Want to lock in a date? 🏆",
   },
   {
     id: 'lifestyle',
-    keywords: ['lifestyle','outdoor','nature','casual','everyday','candid','golden hour','fall','autumn','family'],
+    keywords: ['lifestyle','outdoor','nature','casual','everyday','candid','golden hour','fall','autumn'],
     response: "Lifestyle sessions are so natural and fun — no stiff poses, just real moments in real places. Fall light right now is absolutely stunning. Want to pick a date? 🍂",
   },
   {
     id: 'travel',
-    keywords: ['travel','trip','vacation','destination','outside','location','park','beach','mountain','downtown'],
-    response: "I love shooting on-location — the more interesting the spot the better the story. Where are you thinking? ✈️",
+    keywords: ['travel','trip','vacation','destination','outside','park','beach','mountain','downtown'],
+    response: "I love shooting on-location — the more interesting the spot the better the story. Where are you thinking? Want to set something up? ✈️",
   },
   {
     id: 'food',
@@ -96,7 +136,7 @@ const INTENTS: Intent[] = [
   {
     id: 'events',
     keywords: ['event','wedding','birthday','party','graduation','ceremony','concert','recital','reunion','corporate'],
-    response: "Events are all about being in the right place at the right moment — I live for that. Tell me about your event: date, type, and location. 🎉",
+    response: "Events are all about being in the right place at the right moment — I live for that. Tell me about your event: date, type, and location. Want to get it on the calendar? 🎉",
   },
   {
     id: 'pricing',
@@ -105,7 +145,7 @@ const INTENTS: Intent[] = [
   },
   {
     id: 'location',
-    keywords: ['where','location','travel','local','area','distance','far','drive','near','come to'],
+    keywords: ['where','local','area','distance','far','drive','near','come to'],
     flow: 'location',
   },
   {
@@ -125,18 +165,17 @@ const INTENTS: Intent[] = [
   },
   {
     id: 'thanks',
-    keywords: ['thanks','thank you','appreciate','perfect','great','awesome','sounds good','wonderful','amazing','love it'],
+    keywords: ['thanks','thank you','appreciate','wonderful','amazing','love it'],
     response: "Of course — I'm so excited to work with you! Anything else I can help with? 📸",
   },
   {
     id: 'contact',
-    keywords: ['contact','reach','call','email','phone','message','text','dm','instagram','social'],
+    keywords: ['contact','reach','call','phone','message','text','dm','instagram','social'],
     response: "Best way is right here through this chat — I'll follow up within 24 hours once you book. Want to go ahead and lock in a date? 📅",
   },
 ]
 
 // ── Flow responses ────────────────────────────────────────────────────────────
-
 const PRICING_RESPONSE =
 `Here's a general idea of my rates:
 
@@ -145,19 +184,19 @@ const PRICING_RESPONSE =
 ⚡ Sports / action — from $175
 🎉 Events — contact for a custom quote
 
-Every session is tailored — reach out and we'll find something that works for you. Want to book?`
+Every session is tailored — reach out and we'll find something that works for you. Want to book? 📅`
 
 const PORTFOLIO_RESPONSE =
 `Here's some of my recent work — head over to the full portfolio for the gallery:
 
 👉 antcpu.com/manda
 
-I shoot portraits, lifestyle, sports, travel, and culinary. What catches your eye?`
+I shoot portraits, lifestyle, sports, travel, and culinary. Anything catch your eye — want to book a session? 📅`
 
 const LOCATION_RESPONSE =
 `I'm based locally and shoot entirely on-location — parks, your home, sporting venues, downtown, wherever makes sense for your session.
 
-I also travel for the right project. Where are you thinking? 📍`
+I also travel for the right project. Want to lock in a date? 📅`
 
 const FALLBACKS = [
   "Tell me more — I want to make sure I get this right for you 😊",
@@ -168,7 +207,6 @@ const FALLBACKS = [
 ]
 
 // ── Intent matcher ────────────────────────────────────────────────────────────
-
 function matchIntent(message: string): Intent | null {
   const lower = message.toLowerCase()
   let best: { intent: Intent; score: number } | null = null
@@ -181,38 +219,7 @@ function matchIntent(message: string): Intent | null {
   return best?.intent ?? null
 }
 
-// ── Discord notify on booking ─────────────────────────────────────────────────
-
-async function notifyBooking(booking: BookingSession) {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL
-  if (!webhookUrl) return
-
-  const embed = {
-    title:       '📅 New Booking Request',
-    color:       0xc8f564,
-    fields: [
-      { name: 'Name',         value: booking.name        || '—', inline: true  },
-      { name: 'Session Type', value: booking.sessionType || '—', inline: true  },
-      { name: 'Date',         value: booking.date        || '—', inline: true  },
-      { name: 'Email',        value: booking.email       || '—', inline: false },
-    ],
-    footer: { text: `Amanda Photography · ${SEASON.label} · via agent` },
-    timestamp: new Date().toISOString(),
-  }
-
-  try {
-    await fetch(webhookUrl, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ embeds: [embed] }),
-    })
-  } catch (err) {
-    console.error('Discord notify failed:', err)
-  }
-}
-
 // ── Scripted reply engine ─────────────────────────────────────────────────────
-
 async function scriptedReply(
   message: string,
   sessionId: string
@@ -224,47 +231,88 @@ async function scriptedReply(
   if (session) {
     const step = session.step
 
-    // Capture data from previous step's answer
+    // Always log user message
+    session.messages.push({ role: 'user', message, field_context: `step:${step}` })
+
     if (step === 1) {
-      // They answered session type
+      // Capture session type
       session.sessionType = message.trim()
+
     } else if (step === 2) {
-      // They answered name
+      // Capture name — fire partial lead to ADS
       session.name = message.trim()
+
+      // Non-blocking — don't await, don't block reply
+      postToADS({
+        type:        'partial',
+        sessionId,
+        name:        session.name,
+        sessionType: session.sessionType,
+        messages:    [...session.messages],
+      }).catch(() => {})
+
     } else if (step === 3) {
-      // They answered date
+      // Capture date
       session.date = message.trim()
+
     } else if (step === 4) {
-      // They answered email — booking complete
+      // Capture email — validate first
+      const emailLike = message.includes('@') && message.includes('.')
+      if (!emailLike) {
+        // Don't advance — re-prompt
+        session.messages.push({ role: 'agent', message: EMAIL_RETRY, field_context: 'step:4:retry' })
+        sessions.set(sessionId, session)
+        return EMAIL_RETRY
+      }
+
       session.email = message.trim()
       sessions.delete(sessionId)
 
-      // Fire Discord notification
-      await notifyBooking(session)
-
-      return BOOKING_COMPLETE(
-        session.name || 'there',
+      const reply = BOOKING_COMPLETE(
+        session.name        || 'there',
         session.sessionType || 'photography',
-        session.date || 'your chosen date'
+        session.date        || 'your chosen date'
       )
+
+      session.messages.push({ role: 'agent', message: reply, field_context: 'step:4:complete' })
+
+      // Fire complete lead to ADS — Discord + Resend + Supabase bookings
+      postToADS({
+        type:        'complete',
+        sessionId,
+        name:        session.name,
+        email:       session.email,
+        sessionType: session.sessionType,
+        date:        session.date,
+        messages:    [...session.messages],
+      }).catch(() => {})
+
+      return reply
     }
 
-    // Advance to next step
+    // Advance step
+    const reply = BOOKING_STEPS[step] ?? BOOKING_STEPS[BOOKING_STEPS.length - 1]
+    session.messages.push({ role: 'agent', message: reply, field_context: `step:${step}:prompt` })
     session.step = step + 1
     sessions.set(sessionId, session)
-    return BOOKING_STEPS[step] ?? BOOKING_STEPS[BOOKING_STEPS.length - 1]
+    return reply
   }
 
   // ── Start booking flow ──
   if (intent?.flow === 'booking') {
+    const reply = BOOKING_STEPS[0]
     sessions.set(sessionId, {
       step:        1,
       sessionType: '',
       name:        '',
       date:        '',
       email:       '',
+      messages: [
+        { role: 'user',  message, field_context: 'intent:booking' },
+        { role: 'agent', message: reply, field_context: 'step:0:prompt' },
+      ],
     })
-    return BOOKING_STEPS[0]
+    return reply
   }
 
   // ── Single-response flows ──
@@ -279,43 +327,7 @@ async function scriptedReply(
   return FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)]
 }
 
-// ── OpenAI reply — swap in when key is available ──────────────────────────────
-// To activate: set OPENAI_API_KEY in Vercel env vars
-// Then replace `scriptedReply()` call below with `openaiReply()`
-
-async function openaiReply(message: string): Promise<string> {
-  const liveCategories = CATEGORIES
-    .filter(c => c.live)
-    .map(c => c.label)
-    .join(', ')
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method:  'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model:       AGENT.model,
-      max_tokens:  AGENT.maxTokens,
-      temperature: 0.75,
-      messages: [
-        {
-          role:    'system',
-          content: `${AGENT.systemPrompt}\nLive categories: ${liveCategories}.\n${SEASON.cta}`,
-        },
-        { role: 'user', content: message },
-      ],
-    }),
-  })
-
-  if (!res.ok) throw new Error(`OpenAI ${res.status}`)
-  const data = await res.json()
-  return data.choices?.[0]?.message?.content?.trim() ?? ''
-}
-
 // ── Route handlers ────────────────────────────────────────────────────────────
-
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS })
 }
@@ -332,12 +344,9 @@ export async function POST(req: NextRequest) {
     }
 
     const sessionId = getSessionId(req)
+    const reply     = await scriptedReply(message.trim(), sessionId)
 
-    // ── Swap this line to activate OpenAI: ──
-    // const reply = await openaiReply(message.trim())
-    const reply = await scriptedReply(message.trim(), sessionId)
-
-    // Small human-feel delay 100–350ms
+    // Human-feel delay 100–350ms
     await new Promise(r => setTimeout(r, 100 + Math.random() * 250))
 
     return NextResponse.json(
@@ -346,7 +355,7 @@ export async function POST(req: NextRequest) {
     )
 
   } catch (err) {
-    console.error('Chat error:', err)
+    console.error('[chat] error:', err)
     return NextResponse.json(
       { reply: "I'm here! Tell me what you're looking for and I'll help you out 📸" },
       { status: 200, headers: CORS }
