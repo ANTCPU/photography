@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
           folder:        `${CLOUDINARY.folder}/${category}`,
           public_id:     publicId,
           overwrite:     true,
-          resource_type: 'image',
+          resource_type: 'auto',
         },
         (err, res) => (err ? reject(err) : resolve(res))
       ).end(buffer)
